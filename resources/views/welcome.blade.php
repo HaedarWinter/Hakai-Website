@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Hakai | {{$title}}</title>
+    <title>Hakai | </title>
     <meta name="description" content="">
     <meta name="keywords" content="">
 
@@ -30,6 +30,7 @@
 </head>
 
 <body class="index-page">
+
 
 <header id="header" class="header d-flex align-items-center sticky-top">
     <div class="container-fluid container-xl position-relative d-flex align-items-center">
@@ -76,9 +77,18 @@
                         Hakai
                     </h1>
                     <p>Platform manajemen tugas yang membantu Anda bekerja lebih efektif</p>
-                    <div class="d-flex">
-                        <a href="#about" class="btn-get-started">Ayo Cari Tahu Lebih Lanjut!</a>
-                    </div>
+                   
+
+                    @if(auth()->check())
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-hakai px-4 rounded-pill">Logout</button>
+                        </form>
+                    @else
+                        <div class="d-flex">
+                            <a href="#about" class="btn-getstarted">Ayo Cari Tahu Lebih Lanjut!</a>
+                        </div>
+                    @endif
                 </div>
                 <div class=" col-lg-6 order-1 order-lg-2 hero-img" data-aos="zoom-out" data-aos-delay="100">
                     <img src="{{asset('enno/assets/img/hero-img.png')}}" class="img-fluid animated" alt="">

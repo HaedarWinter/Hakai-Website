@@ -1,45 +1,42 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Data Tugas Karyawan</title>
-    <style>
-        body { font-family: sans-serif; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        h2, h3 { margin: 0; padding: 4px 0; }
-    </style>
-</head>
-<body>
-<h2>Laporan Tugas Karyawan</h2>
-<p>Tanggal cetak: {{ $tanggal }} {{ $jam }}</p>
-@if($tugas)
-<@foreach($tugas as $t)
+@extends('layouts.pdf-base')
 
-        <h3>Detail Tugas</h3>
-        <table>
-            <tr>
-                <th>Nama Karyawan</th>
-                <td>{{ $t->user->name }}</td>
-            </tr>
-            <tr>
-                <th>Tugas</th>
-                <td>{{ $t->tugas }}</td>
-            </tr>
-            <tr>
-                <th>Tanggal Mulai</th>
-                <td>{{ $t->tanggal_mulai }}</td>
-            </tr>
-            <tr>
-                <th>Tanggal Selesai</th>
-                <td>{{ $t->tanggal_selesai }}</td>
-            </tr>
-        </table>
-        @endforeach
+@section('title', 'Laporan Tugas Saya')
 
-@else
-    <p><i>Belum ada tugas yang diberikan.</i></p>
-@endif
-</body>
-</html>
+@section('content')
+<div class="header">
+    <h1>LAPORAN TUGAS SAYA</h1>
+    <p>Nama: {{ Auth::user()->nama }} | Email: {{ Auth::user()->email }}</p>
+    <p>Periode: {{ $data['tanggal'] }} | Pukul: {{ $data['jam'] }}</p>
+</div>
+
+<table>
+    <thead>
+    <tr>
+        <th class="text-center">No</th>
+        <th>Tugas</th>
+        <th class="text-center">Tanggal Mulai</th>
+        <th class="text-center">Tanggal Selesai</th>
+        <th class="text-center">Status</th>
+        <th class="text-center">Catatan</th>
+    </tr>
+    </thead>
+    <tbody>
+    @forelse($data['tugas'] as $index => $tugas)
+        <tr>
+            <td class="text-center">{{ $index + 1 }}</td>
+            <td>{{ $tugas->tugas }}</td>
+            <td class="text-center">{{ $tugas->tanggal_mulai->format('d-m-Y') }}</td>
+            <td class="text-center">{{ $tugas->tanggal_selesai->format('d-m-Y') }}</td>
+            <td class="text-center">
+                <x-pdf-status-badge :status="$tugas->status" />
+            </td>
+            <td>{{ $tugas->catatan ?? '-' }}</td>
+        </tr>
+    @empty
+        <tr>
+            <td colspan="6" class="text-center">Tidak ada data tugas</td>
+        </tr>
+    @endforelse
+    </tbody>
+</table>
+@endsection

@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'haev@gmail.com',
             'jabatan' => 'Admin',
             'password' => Hash::make('admin1234'),
-            'is_tugas' => false,
         ]);
 
         User::create([
@@ -28,7 +27,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'piaimut@gmail.com',
             'jabatan' => 'Karyawan',
             'password' => Hash::make('admin1234'),
-            'is_tugas' => false,
         ]);
 
         User::create([
@@ -36,7 +34,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'Anditaimut@gmail.com',
             'jabatan' => 'Karyawan',
             'password' => Hash::make('admin1234'),
-            'is_tugas' => false,
         ]);
 
         User::create([
@@ -44,7 +41,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'jojo@gmail.com',
             'jabatan' => 'Karyawan',
             'password' => Hash::make('adminindo'),
-            'is_tugas' => false,
          ]);
     }
 }

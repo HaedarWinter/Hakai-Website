@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\User;
+use App\Services\StatisticsService;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -13,65 +14,19 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Font;
-use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 class UserExport implements FromView, ShouldAutoSize, WithEvents, WithProperties, WithTitle
 {
     private $users;
     private $stats;
+    private $statsService;
 
     public function __construct()
     {
+        $this->statsService = app(StatisticsService::class);
         $this->users = User::orderBy('jabatan', 'ASC')->get();
-        $this->calculateStats();
-    }
-
-    private function calculateStats()
-    {
-        // Statistik berdasarkan role/jabatan
-        $adminCount = $this->users->where('jabatan', 'Admin')->count();
-        $userCount = $this->users->whereNotIn('jabatan', ['Admin'])->count();
-
-        // Statistik tugas (exclude Admin)
-        $nonAdminUsers = $this->users->whereNotIn('jabatan', ['Admin']);
-        $tugasSelesai = $nonAdminUsers->where('is_tugas', true)->count();
-        $tugasBelumSelesai = $nonAdminUsers->where('is_tugas', false)->count();
-
-        // Statistik per role dan tugas
-        $userDitugaskan = $this->users->whereNotIn('jabatan', ['Admin'])->where('is_tugas', true)->count();
-        $userBelumDitugaskan = $this->users->whereNotIn('jabatan', ['Admin'])->where('is_tugas', false)->count();
-
-        $this->stats = [
-            // Total users
-            'total' => $this->users->count(),
-            'admin_count' => $adminCount,
-            'user_count' => $userCount,
-
-            // Status tugas
-            'tugas_selesai' => $tugasSelesai,
-            'tugas_belum_selesai' => $tugasBelumSelesai,
-            'persentase_selesai' => $this->users->count() > 0
-                ? round(($tugasSelesai / $this->users->count()) * 100, 1)
-                : 0,
-
-            // Detail per role
-            'user_ditugaskan' => $userDitugaskan,
-            'user_belum_ditugaskan' => $userBelumDitugaskan,
-
-            // Persentase per role
-            'persentase_selesai' => $nonAdminUsers->count() > 0
-                ? round(($tugasSelesai / $nonAdminUsers->count()) * 100, 1)
-                : 0,
-            'user_persentase_selesai' => $userCount > 0
-                ? round(($userDitugaskan / $userCount) * 100, 1)
-                : 0,
-
-            // Info tambahan
-            'jabatan_list' => $this->users->pluck('jabatan')->unique()->values()->toArray(),
-            'updated_at' => now()->format('d F Y H:i:s')
-        ];
+        $this->stats = $this->statsService->calculateUserStats($this->users);
     }
 
     public function view(): View

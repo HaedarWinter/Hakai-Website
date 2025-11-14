@@ -12,19 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tugas', function (Blueprint $table) {
-            $table->string('status')->default('pending')->after('tanggal_selesai'); // pending, approved, rejected
+            $table->enum('priority', ['low', 'medium', 'high'])->default('medium')->after('status');
         });
     }
-
-
 
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         Schema::table('tugas', function (Blueprint $table) {
-            $table->dropColumn('status');
+            $table->dropColumn('priority');
         });
     }
 };

@@ -22,7 +22,7 @@ class AuthController extends Controller
      */
     public function loginProses(Request $request)
     {
-        //  Validasi input
+        // Validasi input
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string', 'min:8', 'max:16'],
@@ -34,25 +34,25 @@ class AuthController extends Controller
             'password.max' => 'Kata Sandi Maksimal 16 Karakter',
         ]);
 
-        //  Cek kredensial
+        // Cek kredensial
         if (!Auth::attempt($credentials, $request->filled('remember'))) {
             return back()->withErrors([
                 'email' => 'Email atau Password Salah',
             ])->onlyInput('email');
         }
 
-        //  Regenerate session biar aman (hindari session fixation)
+        // Regenerate session biar aman (hindari session fixation)
         $request->session()->regenerate();
 
         $user = Auth::user();
 
-        //  Hapus token lama biar ga numpuk
+        // Hapus token lama biar ga numpuk
         $user->tokens()->delete();
 
-        //  Buat token Sanctum baru
+        // Buat token Sanctum baru
         $token = $user->createToken('web_session')->plainTextToken;
 
-        //  Simpan token ke session (jika perlu digunakan di Blade/frontend)
+        // Simpan token ke session
         session(['sanctum_token' => $token]);
 
         return redirect()->route('dashboard')
@@ -64,15 +64,15 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        //  Hapus semua token Sanctum milik user
+        // Hapus semua token Sanctum milik user
         if ($request->user()) {
             $request->user()->tokens()->delete();
         }
 
-        //  Logout dari Laravel session
+        // Logout dari Laravel session
         Auth::logout();
 
-        //  Hapus session & regenerate CSRF token
+        // Hapus session & regenerate CSRF token
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

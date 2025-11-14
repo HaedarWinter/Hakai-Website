@@ -9,17 +9,20 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('is_tugas');
+            $table->boolean('is_tugas')->default(false)->after('password');
         });
     }
 
-    public function down()
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_tugas')->default(false);
+            $table->dropColumn('is_tugas');
         });
     }
 };
