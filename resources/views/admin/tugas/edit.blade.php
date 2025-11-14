@@ -2,7 +2,7 @@
 
 @section('content')
     <h1 class="h3 mb-4 text-gray-800">
-        <i class="fas fa-plus"></i>
+        <i class="fas fa-edit"></i>
         {{ $title }}
     </h1>
 
@@ -19,7 +19,7 @@
 
         <!-- Card Body -->
         <div class="card-body">
-            <form action="{{ route('tugas.store') }}" method="POST">
+            <form action="{{ route('tugas.update', $tugas->id) }}" method="POST">
                 @csrf
                 <div class="row">
                     <!-- Insert Column Nama -->
@@ -29,7 +29,7 @@
                             Nama :
                         </label>
                         <input type="text" value="{{$tugas->user->nama}}"
-                        class="form-control" disabled>
+                               class="form-control" disabled>
                     </div>
                     <!-- Nama -->
                     <div class="col-md-12 col-12 mb-3">

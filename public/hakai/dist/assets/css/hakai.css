@@ -1,0 +1,48 @@
+.btn-hakai,
+.btn-hakai:focus {
+    color: var(--contrast-color);
+    background: var(--accent-color);
+    border-radius: 50px;
+    transition: 0.3s;
+}
+
+.btn-hakai:hover,
+.btn-hakai:focus:hover {
+    color: var(--contrast-color);
+    background: color-mix(in srgb, var(--accent-color), transparent 15%);
+}
+
+
+/*LOGIN*/
+
+.btn-outline-hakai {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-outline-hakai:hover {
+    color: #fff;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-outline-hakai:focus, .btn-outline-hakai.focus {
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.5);
+}
+
+.btn-outline-hakai.disabled, .btn-outline-hakai:disabled {
+    color: var(--accent-color);
+    background-color: transparent;
+}
+
+.btn-outline-hakai:not(:disabled):not(.disabled):active, .btn-outline-hakai:not(:disabled):not(.disabled).active,
+.show > .btn-outline-hakai {
+    color: #fff;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.btn-outline-hakai:not(:disabled):not(.disabled):active:focus, .btn-outline-primary:not(:disabled):not(.disabled).active:focus,
+.show > .btn-outline-hakai{
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.5);
+}

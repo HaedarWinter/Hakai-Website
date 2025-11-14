@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Tugas;
+use App\Services\StatisticsService;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -13,77 +14,57 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Font;
-use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 class TugasExport implements FromView, ShouldAutoSize, WithEvents, WithProperties, WithTitle
 {
     private $tugas;
     private $stats;
+    private $statsService;
 
     public function __construct()
     {
-        $this->tugas = Tugas::with('user')->orderBy('created_at', 'DESC')->get();
-        $this->calculateStats();
-    }
-
-    private function calculateStats()
-    {
-        // Total tugas
-        $totalTugas = $this->tugas->count();
-
-        // Status berdasarkan tanggal
-        $today = now();
-        $tugasSelesai = $this->tugas->filter(function($item) use ($today) {
-            return $item->tanggal_selesai && $today->gte($item->tanggal_selesai);
-        })->count();
-
-        $tugasSedangBerjalan = $this->tugas->filter(function($item) use ($today) {
-            return $item->tanggal_mulai && $today->gte($item->tanggal_mulai) &&
-                (!$item->tanggal_selesai || $today->lt($item->tanggal_selesai));
-        })->count();
-
-        $tugasBelumMulai = $this->tugas->filter(function($item) use ($today) {
-            return $item->tanggal_mulai && $today->lt($item->tanggal_mulai);
-        })->count();
-
-        // Status berdasarkan durasi (overdue check)
-        $tugasOverdue = $this->tugas->filter(function($item) use ($today) {
-            return $item->tanggal_selesai && $today->gt($item->tanggal_selesai);
-        })->count();
-
-        // Statistik per user
+        $this->statsService = app(StatisticsService::class);
+        $this->tugas = Tugas::with('user')->whereNull('deleted_at')->orderBy('created_at', 'DESC')->get();
+        $this->stats = $this->statsService->calculateTaskStats($this->tugas);
+        
+        // Add additional stats for export
         $totalUserBertugas = $this->tugas->pluck('user.id')->unique()->count();
-
-        $this->stats = [
-            // Total tugas
-            'total' => $totalTugas,
-            'total_user_bertugas' => $totalUserBertugas,
-
-            // Status tugas berdasarkan waktu
+        $this->stats['total_user_bertugas'] = $totalUserBertugas;
+        
+        // Legacy stats mapping for backward compatibility with views
+        $today = now();
+        $tugasSelesai = $this->tugas->filter(fn($item) => 
+            $item->tanggal_selesai && $today->gte($item->tanggal_selesai)
+        )->count();
+        
+        $tugasSedangBerjalan = $this->tugas->filter(fn($item) => 
+            $item->tanggal_mulai && $today->gte($item->tanggal_mulai) &&
+            (!$item->tanggal_selesai || $today->lt($item->tanggal_selesai))
+        )->count();
+        
+        $tugasBelumMulai = $this->tugas->filter(fn($item) => 
+            $item->tanggal_mulai && $today->lt($item->tanggal_mulai)
+        )->count();
+        
+        $tugasOverdue = $this->tugas->filter(fn($item) => 
+            $item->tanggal_selesai && $today->gt($item->tanggal_selesai)
+        )->count();
+        
+        $totalTugas = $this->tugas->count();
+        
+        $this->stats = array_merge($this->stats, [
             'tugas_selesai' => $tugasSelesai,
             'tugas_sedang_berjalan' => $tugasSedangBerjalan,
             'tugas_belum_mulai' => $tugasBelumMulai,
             'tugas_overdue' => $tugasOverdue,
-
-            // Persentase
-            'persentase_selesai' => $totalTugas > 0
-                ? round(($tugasSelesai / $totalTugas) * 100, 1)
-                : 0,
-            'persentase_sedang_berjalan' => $totalTugas > 0
-                ? round(($tugasSedangBerjalan / $totalTugas) * 100, 1)
-                : 0,
-            'persentase_belum_mulai' => $totalTugas > 0
-                ? round(($tugasBelumMulai / $totalTugas) * 100, 1)
-                : 0,
+            'persentase_selesai' => $totalTugas > 0 ? round(($tugasSelesai / $totalTugas) * 100, 1) : 0,
+            'persentase_sedang_berjalan' => $totalTugas > 0 ? round(($tugasSedangBerjalan / $totalTugas) * 100, 1) : 0,
+            'persentase_belum_mulai' => $totalTugas > 0 ? round(($tugasBelumMulai / $totalTugas) * 100, 1) : 0,
             'persentase_overdue' => $totalTugas > 0
                 ? round(($tugasOverdue / $totalTugas) * 100, 1)
-                : 0,
-
-            // Info tambahan
-            'updated_at' => now()->format('d F Y H:i:s')
-        ];
+                : 0
+        ]);
     }
 
     public function view(): View

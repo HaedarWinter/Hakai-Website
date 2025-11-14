@@ -1,90 +1,135 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
+    <title>Hakai | {{$title}}</title>
+    <!-- [Meta] -->
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
-    <meta name="author" content="">
 
-    <title> Hakai | {{$title}}</title>
+    <!-- [Favicon] -->
     <link href="{{asset('enno/assets/img/logo-hakai.png')}}" rel="icon">
-    <link href="{{asset('sbadmin2/vendor/fontawesome-free/css/all.min.css')}}" rel="stylesheet" type="text/css">
-    <link
-        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
-        rel="stylesheet">
-    <link href="{{asset('sbadmin2/css/sb-admin-2.min.css')}}" rel="stylesheet">
 
+    <!-- Vendor CSS Files (Enno) -->
+    <link href="{{asset('enno/assets/vendor/bootstrap/css/bootstrap.min.css')}}" rel="stylesheet">
+    <link href="{{asset('enno/assets/vendor/bootstrap-icons/bootstrap-icons.css')}}" rel="stylesheet">
+    <link href="{{asset('enno/assets/vendor/aos/aos.css')}}" rel="stylesheet">
+    <link href="{{asset('enno/assets/vendor/glightbox/css/glightbox.min.css')}}" rel="stylesheet">
+    <link href="{{asset('enno/assets/vendor/swiper/swiper-bundle.min.css')}}" rel="stylesheet">
+
+    <!-- Main CSS File -->
+    <link href="{{asset('enno/assets/css/main.css')}}" rel="stylesheet">
+
+
+    <!-- [Fonts & CSS] -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" id="main-font-link">
+    <link rel="stylesheet" href="{{asset('hakai/dist/assets/fonts/tabler-icons.min.css')}}" >
+    <link rel="stylesheet" href="{{asset('hakai/dist/assets/fonts/feather.css')}}" >
+    <link rel="stylesheet" href="{{asset('hakai/dist/assets/fonts/fontawesome.css')}}" >
+    <link rel="stylesheet" href="{{asset('hakai/dist/assets/fonts/material.css')}}" >
+    <link rel="stylesheet" href="{{asset('hakai/dist/assets/css/style.css')}}" id="main-style-link" >
+    <link rel="stylesheet" href="{{asset('hakai/dist/assets/css/style-preset.css')}}" >
 </head>
 
-<body class="bg-gradient-primary">
+<body>
+<!-- [ Pre-loader ] start -->
+<div class="loader-bg">
+    <div class="loader-track">
+        <div class="loader-fill"></div>
+    </div>
+</div>
+<!-- [ Pre-loader ] End -->
 
-<div class="container">
-
-    <!-- Outer Row -->
-    <div class="row justify-content-center">
-
-        <div class=" col-xl-6 col-lg-7 col-md-9">
-
-            <div class="card o-hidden border-0 shadow-lg my-5">
-                <div class="card-body p-0">
-                    <div class="row">
-                        <div class="col-lg-12">
-                            <div class="p-5">
-                                <div class="text-center">
-                                    <h1 class="h4 text-gray-900 mb-4">
-                                        <i class="fas fa-tasks mr-2"></i> Hakai <span class="text-center p-2">|</span> Login
-                                    </h1>
-                                </div>
-                                <form class="user" method="POST" action="{{route('loginProses')}}">
-                                    @csrf
-                                    <div class="form-group">
-                                        <input type="email" class="form-control form-control-user @error('email') is-invalid @enderror"
-                                               placeholder="Masukkan Alamat Email" name="email" value="{{old('email')}}">
-                                        @error('email')
-                                        <small class="text-danger">
-                                            {{$message}}
-                                        </small>
-                                        @enderror
-                                    </div>
-                                    <div class="form-group">
-                                        <input type="password" class="form-control form-control-user @error('password') is-invalid @enderror"
-                                               placeholder="Masukkan Kata Sandi" name="password">
-                                        @error('password')
-                                        <small class="text-danger">
-                                            {{$message}}
-                                        </small>
-                                        @enderror
-                                    </div>
-                                    <button type="submit" class="btn btn-primary btn-user btn-block">
-                                        Masuk
-                                    </button>
-                                </form>
-                                <hr>
-                                <div class="text-center">
-                                    <small>
-                                        Kembali ke Beranda?
-                                        <a href="{{route('welcome')}}">Klik Disini</a>
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+<div class="auth-main">
+    <div class="auth-wrapper v3">
+        <div class="auth-form">
+            <!-- Logo + Judul -->
+            <div class="auth-header">
+                <div style="display: flex; align-items: center;">
+                    <img src="{{ asset('enno/assets/img/logo-hakai.png') }}" alt="Logo Hakai" style="height: 60px; width: auto; margin-right: 10px;">
+                    <span style="font-size: 24px; font-weight: bold; color: #6C3AF0;">HAKAI</span>
                 </div>
             </div>
+
+            <!-- Card Form -->
+            <div class="card my-5">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-end mb-4">
+                        <h3 class="mb-0"><b>Masuk</b></h3>
+                        <img class="text-center" src="{{ asset('enno/assets/img/logo-hakai.png') }}" alt="Logo Hakai" style="height: 30px; width: auto; margin-right: 10px;">
+                    </div>
+
+                    <!-- Form Login -->
+                    <form method="POST" action="{{ route('loginProses') }}">
+                        @csrf
+                        <div class="form-group mb-3">
+                            <span class="text-danger">
+                                <label class="form-label">Email Address</label>
+                                *
+                            </span>
+
+                            <input type="email"
+                                   class="form-control @error('email') is-invalid @enderror"
+                                   name="email"
+                                   value="{{ old('email') }}"
+                                   placeholder="Email Address">
+                            @error('email')
+                            <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <span class="text-danger">
+                                <label class="form-label">Password</label>
+                                *</span>
+                            <input type="password"
+                                   class="form-control @error('password') is-invalid @enderror"
+                                   name="password"
+                                   placeholder="Password">
+                            @error('password')
+                            <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-getstarted">Masuk</button>
+                        </div>
+                    </form>
+
+
+
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="auth-footer row">
+                <div class="col my-1">
+                    <p class="m-0">Copyright © <a href="#">Hakai</a></p>
+                </div>
+                <div class="col-auto my-1">
+                    <ul class="list-inline footer-link mb-0">
+                        <li class="list-inline-item"><a href="{{ route('welcome') }}">Home</a></li>
+                        <li class="list-inline-item"><a href="#">Privacy Policy</a></li>
+                        <li class="list-inline-item"><a href="#">Contact us</a></li>
+                    </ul>
+                </div>
+            </div>
+
         </div>
     </div>
-
 </div>
 
-<!-- Bootstrap core JavaScript-->
-<script src="{{asset('sbadmin2/vendor/jquery/jquery.min.js')}}"></script>
-<script src="{{asset('sbadmin2/vendor/bootstrap/js/bootstrap.bundle.min.js')}}"></script>
-<script src="{{asset('sbadmin2/vendor/jquery-easing/jquery.easing.min.js')}}"></script>
-<script src="{{asset('sbadmin2/js/sb-admin-2.min.js')}}"></script>
+
+
+<!-- [ JS ] -->
+<script src="{{asset('hakai/dist/assets/js/plugins/popper.min.js')}}"></script>
+<script src="{{asset('hakai/dist/assets/js/plugins/simplebar.min.js')}}"></script>
+<script src="{{asset('hakai/dist/assets/js/plugins/bootstrap.min.js')}}"></script>
+<script src="{{asset('hakai/dist/assets/js/fonts/custom-font.js')}}"></script>
+<script src="{{asset('hakai/dist/assets/js/pcoded.js')}}"></script>
+<script src="{{asset('hakai/dist/assets/js/plugins/feather.min.js')}}"></script>
 <script src="{{asset('sweetalert2/dist/sweetalert2.all.min.js')}}"></script>
+
 @session('success')
 <script>
     Swal.fire({

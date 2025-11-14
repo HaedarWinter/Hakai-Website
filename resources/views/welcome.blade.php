@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Hakai | {{$title}}</title>
+    <title>Hakai | </title>
     <meta name="description" content="">
     <meta name="keywords" content="">
 
@@ -31,6 +31,7 @@
 
 <body class="index-page">
 
+
 <header id="header" class="header d-flex align-items-center sticky-top">
     <div class="container-fluid container-xl position-relative d-flex align-items-center">
 
@@ -49,7 +50,13 @@
             <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
         </nav>
 
-        <a class="btn-getstarted" href="{{route('login')}}">Masuk</a>
+        @auth
+            <a class="btn-getstarted" href="{{route('dashboard')}}">Kembali ke Dashboard</a>
+        @else
+            <a class="btn-getstarted" href="{{route('login')}}">Masuk</a>
+        @endauth
+
+
 
     </div>
 </header>
@@ -70,9 +77,18 @@
                         Hakai
                     </h1>
                     <p>Platform manajemen tugas yang membantu Anda bekerja lebih efektif</p>
-                    <div class="d-flex">
-                        <a href="#about" class="btn-get-started">Ayo Cari Tahu Lebih Lanjut!</a>
-                    </div>
+                   
+
+                    @if(auth()->check())
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-hakai px-4 rounded-pill">Logout</button>
+                        </form>
+                    @else
+                        <div class="d-flex">
+                            <a href="#about" class="btn-getstarted">Ayo Cari Tahu Lebih Lanjut!</a>
+                        </div>
+                    @endif
                 </div>
                 <div class=" col-lg-6 order-1 order-lg-2 hero-img" data-aos="zoom-out" data-aos-delay="100">
                     <img src="{{asset('enno/assets/img/hero-img.png')}}" class="img-fluid animated" alt="">
@@ -123,15 +139,20 @@
 
                     <div class="mt-5">
                         <h5 class="mb-3 fw-bold">Siap lebih produktif? Yuk!</h5>
-                        <div class="d-flex  gap-3">
-                            <button type="button" class="btn btn-hakai px-4 rounded-pill">
-                                Daftar
-                            </button>
-                            <span class="text-muted p-1">atau</span>
-                            <a href="{{ route('login') }}" class="btn btn-outline-hakai px-4 rounded-pill">
-                                Masuk
-                            </a>
-                        </div>
+                        @auth
+                            <div class="d-flex  gap-3">
+                                <a href="{{ route('dashboard') }}" class="btn btn-outline-hakai px-4 rounded-pill">
+                                    Kembali ke Dashboard
+                                </a>
+                            </div>
+                        @else
+                            <div class="d-flex  gap-3">
+                                <a href="{{ route('login') }}" class="btn btn-outline-hakai px-4 rounded-pill">
+                                    Masuk
+                                </a>
+                            </div>
+                        @endauth
+
                     </div>
                 </div>
 

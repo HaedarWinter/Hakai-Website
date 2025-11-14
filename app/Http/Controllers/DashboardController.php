@@ -2,90 +2,52 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Services\StatisticsService;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    protected $statsService;
+
+    public function __construct(StatisticsService $statsService)
+    {
+        $this->statsService = $statsService;
+    }
+
     /**
-     * Display a listing of the resource.
+     * Display the dashboard view.
      */
     public function index()
     {
-        //Ambil Total Uaer
-        $totalUser = User::count();
-        $totalAdmin = User::where('jabatan', 'admin')->count();
-        $totalKaryawan = User::where('jabatan', 'karyawan')->count();
-
-        //Hitungan Persentasi Total User
-        $persentasiAdmin = $totalUser > 0 ? round(($totalAdmin/$totalUser) * 100, 1) : 0;
-        $persentasiKaryawan = $totalUser > 0 ? round(($totalKaryawan/$totalUser) * 100, 1) : 0;
-
-        //Format ke Ribuan
-        $formattedTotalUser = number_format($totalUser, 0, ',', '.') . ' User';
-        $formattedTotalAdmin = number_format($totalAdmin, 0, ',', '.') . ' Admin' ;
-        $formattedTotalKaryawan = number_format($totalKaryawan, 0, ',', '.') . ' Karyawan' ;
-
-        $data = array(
+        return view('dashboard', [
             'title' => 'Dashboard',
             'menuDashboard' => 'active',
-            'totalUser' => $formattedTotalUser,
-            'totalAdmin' => $formattedTotalAdmin,
-            'totalKaryawan' => $formattedTotalKaryawan,
-            'persentasiAdmin' => $persentasiAdmin,
-            'persentasiKaryawan' => $persentasiKaryawan,
-
-        );
-        return view('dashboard', $data);
-
-
+        ]);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Get dashboard statistics.
      */
-    public function create()
+    public function stats()
     {
-        //
+        $stats = $this->statsService->getDashboardStats();
+
+        return response()->json([
+            'success' => true,
+            'data' => $stats
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Get recent tasks.
      */
-    public function store(Request $request)
+    public function recentTasks()
     {
-        //
-    }
+        $tasks = $this->statsService->getRecentTasks();
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'success' => true,
+            'data' => $tasks
+        ]);
     }
 }

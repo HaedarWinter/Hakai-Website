@@ -17,7 +17,6 @@
                         : {{$item -> nama}}
                     </div>
                 </div>
-
                 <div class="row">
                     <div class="col-6">
                         Email
@@ -29,7 +28,6 @@
                         </span>
                     </div>
                 </div>
-
                 <div class="row">
                     <div class="col-6">
                         Jabatan
@@ -47,7 +45,6 @@
                         @endif
                     </div>
                 </div>
-
 
                 <div class="row">
                     <div class="col-6">
@@ -67,20 +64,30 @@
                     </div>
                 </div>
 
+                <!-- Tambahkan alert peringatan jika user masih memiliki tugas -->
+                @if($item->is_tugas)
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Peringatan!</strong> Posisi karyawan sedang ditugaskan. Data ini tidak dapat dihapus.
+                    </div>
+                @endif
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-warning btn-sm" data-dismiss="modal">
                     <i class="fas fa-times"></i>
                     Tutup
                 </button>
-                <form action="{{ route('user.destroy', $item->id) }}" method="POST">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger btn-sm">
-                        <i class="fas fa-trash"></i>
-                        Hapus
-                    </button>
-                </form>
+                <!-- Hanya tampilkan tombol hapus jika user tidak memiliki tugas -->
+                @if(!$item->is_tugas)
+                    <form action="{{ route('user.destroy', $item->id) }}" method="POST">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash"></i>
+                            Hapus
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
     </div>

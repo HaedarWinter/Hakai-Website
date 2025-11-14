@@ -1,10 +1,12 @@
 @extends('layouts.app')
-
 @section('content')
     <h1 class="h3 mb-4 text-gray-800">
         <i class="fas fa-plus"></i>
         {{ $title }}
     </h1>
+
+    {{-- Notifikasi --}}
+    <div id="notification-container"></div>
 
     <div class="card">
         <!-- Card Header -->
@@ -19,59 +21,57 @@
 
         <!-- Card Body -->
         <div class="card-body">
-            <form action="{{ route('tugas.store') }}" method="POST">
+            <!-- PERBAIKAN: TAMBAHKAN ACTION, METHOD, DAN ENCTYPE -->
+            <form action="{{ route('tugas.store') }}" method="POST" enctype="multipart/form-data" id="form-tugas">
                 @csrf
                 <div class="row">
                     <!-- Insert Column Nama -->
                     <div class="col-12 mb-3">
                         <label for="user_id"><span class="text-danger">*</span> Nama :</label>
-                        <select name="user_id" id="jabatan"
-                                class="form-control @error('user_id') is-invalid @enderror">
+                        <select name="user_id" id="user_id"
+                                class="form-control">
                             <option selected disabled>-- Pilih Nama --</option>
                             @foreach($user as $item)
-                                <option value="{{$item->id}}" {{ old('jabatan') == 'Admin' ? 'selected' : '' }}>{{$item->nama}}</option>
+                                <option value="{{$item->id}}" {{ old('user_id') == $item->id ? 'selected' : '' }}>{{$item->nama}}</option>
                             @endforeach
                         </select>
-                        @error('user_id')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <div class="invalid-feedback" id="user_id-error"></div>
                     </div>
-                    <!-- Nama -->
+
+                    <!-- Nama Tugas -->
                     <div class="col-md-12 col-12 mb-3">
-                        <label><span class="text-danger">*</span>
-                            Tugas :
-                        </label>
-                        <textarea name="tugas" rows="5" class="form-control
-                        @error('tugas') is-invalid @enderror"></textarea>
-                        @error('tugas')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label><span class="text-danger">*</span> Tugas :</label>
+                        <textarea name="tugas" id="tugas" rows="1"
+                                  class="form-control"
+                                  oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">{{ old('tugas') }}</textarea>
+                        <div class="invalid-feedback" id="tugas-error"></div>
+                    </div>
+
+                    <!-- Upload File -->
+                    <div class="col-md-12 col-12 mb-3">
+                        <label for="file">Upload File (opsional):</label>
+                        <input type="file" name="file" id="file"
+                               class="form-control-file"
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+                        <small class="form-text text-muted">Format yang diizinkan: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX</small>
+                        <div class="invalid-feedback" id="file-error"></div>
                     </div>
 
                     <div class="col-md-6 col-12 mb-3">
-                        <label><span class="text-danger">*</span>
-                            Tanggal Mulai :
-                        </label>
-                        <input type="date" name="tanggal_mulai"
-                               class="form-control @error('tanggal_mulai') is-invalid
-                               @enderror">
-                        @error('tanggal_mulai')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label><span class="text-danger">*</span> Tanggal Mulai :</label>
+                        <input type="date" name="tanggal_mulai" id="tanggal_mulai"
+                               class="form-control"
+                               value="{{ old('tanggal_mulai') }}">
+                        <div class="invalid-feedback" id="tanggal_mulai-error"></div>
                     </div>
 
                     <div class="col-md-6 col-12 mb-3">
-                        <label><span class="text-danger">*</span>
-                            Tanggal Selesai :
-                        </label>
-                        <input type="date" name="tanggal_selesai"
-                               class="form-control @error('tanggal_selesai') is-invalid
-                               @enderror">
-                        @error('tanggal_selesai')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label><span class="text-danger">*</span> Tanggal Selesai :</label>
+                        <input type="date" name="tanggal_selesai" id="tanggal_selesai"
+                               class="form-control"
+                               value="{{ old('tanggal_selesai') }}">
+                        <div class="invalid-feedback" id="tanggal_selesai-error"></div>
                     </div>
-
                 </div>
 
                 <!-- Save Button -->

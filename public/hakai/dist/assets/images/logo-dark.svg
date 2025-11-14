@@ -1,0 +1,9 @@
+<svg width="160" height="60" viewBox="0 0 160 60" xmlns="http://www.w3.org/2000/svg">
+    <!-- Simbol dari file SVG/PNG -->
+    <image href="{{ asset('enno/assets/img/logo-hakai.svg') }}" x="0" y="0" height="60px" width="60px"/>
+
+    <!-- Teks -->
+    <text x="80" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#6C3AF0">
+        HAKAI
+    </text>
+</svg>

@@ -2,53 +2,81 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes, HasApiTokens;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'name',
+        'nama',
         'email',
         'jabatan',
-        'is_tugas',
         'password',
+        'is_tugas',
     ];
 
-    public function tugas(){
-        return $this->hasOne(Tugas::class);
-    }
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'is_tugas' => 'boolean',
+        'deleted_at' => 'datetime',
+    ];
+
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Get the tasks for the user.
      */
-    protected function casts(): array
+    public function tugas(): HasMany
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->hasMany(Tugas::class);
+    }
+
+    /**
+     * Scope a query to only include admins.
+     */
+    public function scopeAdmins($query)
+    {
+        return $query->where('jabatan', 'Admin');
+    }
+
+    /**
+     * Scope a query to only include employees.
+     */
+    public function scopeEmployees($query)
+    {
+        return $query->where('jabatan', 'Karyawan');
+    }
+
+    /**
+     * Scope a query to only include active users.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_tugas', true);
+    }
+
+    /**
+     * Check if user is an admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->jabatan === 'Admin';
+    }
+
+    /**
+     * Check if user is an employee.
+     */
+    public function isEmployee(): bool
+    {
+        return $this->jabatan === 'Karyawan';
     }
 }
