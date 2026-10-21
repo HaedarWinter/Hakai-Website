@@ -144,7 +144,7 @@
                         style="line-height: 1;">Halo...</span>
                     <span class="font-weight-bold text-gray-800 small">{{ auth()->user()->nama }}</span>
                 </div>
-                <img class="img-profile rounded-circle shadow-sm border border-white"
+                <img class="img-profile rounded-circle shadow-sm border border-white" id="headerProfilePhoto"
                     src="{{ auth()->user()->profile_photo_url ?? asset('sbadmin2/img/undraw_profile.svg') }}"
                     alt="{{ auth()->user()->nama }} profile picture" loading="lazy"
                     style="width: 40px; height: 40px; object-fit: cover;">

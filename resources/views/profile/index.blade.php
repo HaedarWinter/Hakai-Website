@@ -349,6 +349,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <small class="text-muted mr-auto">Foto langsung tersimpan setelah dipotong.</small>
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
                     <button type="button" class="btn btn-primary" id="cropAndSave">Potong & Simpan</button>
                 </div>
@@ -412,22 +413,64 @@
             cropper = new Cropper(document.getElementById('cropperImage'), { aspectRatio: 1, viewMode: 2 });
         }).on('hidden.bs.modal', function () {
             if (cropper) { cropper.destroy(); cropper = null; }
+            $('#photo').val('');
         });
 
         $('#cropAndSave').on('click', function () {
-            if (cropper) {
-                cropper.getCroppedCanvas({ width: 400, height: 400 }).toBlob(function (blob) {
-                    const url = URL.createObjectURL(blob);
-                    $('#profileImageDisplay').attr('src', url);
+            if (!cropper) return;
 
-                    // Set file to input
-                    const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
-                    const dt = new DataTransfer(); dt.items.add(file);
-                    document.getElementById('photo').files = dt.files;
+            const $button = $(this);
+            const originalText = $button.html();
+            $button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span> Menyimpan...');
 
-                    $('#cropperModal').modal('hide');
+            cropper.getCroppedCanvas({ width: 400, height: 400 }).toBlob(function (blob) {
+                const formData = new FormData();
+                formData.append('photo', blob, 'profile.jpg');
+
+                $.ajax({
+                    url: '/api/settings/photo',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    },
+                    success: function (res) {
+                        if (!res.success) {
+                            Swal.fire({ icon: 'error', title: 'Gagal!', text: res.message || 'Foto profil gagal disimpan.' });
+                            return;
+                        }
+
+                        const photoUrl = res.data.url + '?t=' + Date.now();
+                        $('#profileImageDisplay').attr('src', photoUrl);
+                        $('#headerProfilePhoto').attr('src', photoUrl);
+
+                        $('#cropperModal').modal('hide');
+                        $('#photo').val('');
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Tersimpan!',
+                            text: 'Foto profil berhasil diperbarui.',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    },
+                    error: function (xhr) {
+                        const errors = xhr.responseJSON && xhr.responseJSON.errors;
+                        const message = errors
+                            ? Object.values(errors)[0][0]
+                            : (xhr.responseJSON && xhr.responseJSON.message) || 'Foto profil gagal disimpan.';
+
+                        Swal.fire({ icon: 'error', title: 'Gagal!', text: message });
+                    },
+                    complete: function () {
+                        $button.prop('disabled', false).html(originalText);
+                    }
                 });
-            }
+            }, 'image/jpeg', 0.9);
         });
     </script>
 @endsection
