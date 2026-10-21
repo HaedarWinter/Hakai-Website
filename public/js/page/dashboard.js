@@ -105,9 +105,8 @@ $(document).ready(function () {
                 }
 
                 tasksHtml += `
-                    <div class="list-group-item list-group-item-action px-3 py-3 border-0 mb-2 shadow-sm rounded-lg" 
-                         style="transition: transform 0.2s; cursor: pointer; background: var(--glass-bg);">
-                        <div class="d-flex align-items-center">
+                    <div class="recent-task-item d-flex align-items-center px-3 py-3 mb-2">
+                        <div class="d-flex align-items-center w-100">
                             <div class="mr-3 flex-shrink-0">
                                 <div class="icon-circle-sm bg-light shadow-sm">
                                     <i class="fas ${iconClass}"></i>

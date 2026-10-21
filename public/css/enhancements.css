@@ -1324,6 +1324,19 @@ html.dark-mode .badge-counter {
 /* =====================================================
    21. Activity Log Timeline
    ===================================================== */
+.recent-task-item {
+    background: #ffffff;
+    border: 1px solid #edf2f7;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.recent-task-item:hover {
+    background: #f8f9fc;
+    border-color: #dfe6ef;
+}
+
 .activity-timeline {
     position: relative;
     padding-left: 30px;
@@ -1880,18 +1893,17 @@ html.dark-mode .stat-info .stat-value {
 
 /* Activity Item Premium Style */
 .activity-bubble {
-    background: rgba(248, 249, 252, 0.8);
+    background: #ffffff;
     border-radius: 12px;
     padding: 12px;
     margin-bottom: 12px;
     border: 1px solid #edf2f7;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .activity-bubble:hover {
-    background: white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    transform: scale(1.01);
+    background: #f8f9fc;
+    border-color: #dfe6ef;
 }
 
 html.dark-mode .activity-bubble {
