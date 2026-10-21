@@ -548,5 +548,6 @@
 
 @section('scripts')
     <script src="{{ asset('js/export-handler.js') }}"></script>
+    <script src="{{ asset('js/page/tugas/shared.js') }}"></script>
     <script src="{{ asset('js/page/admin/tugas/index.js') }}"></script>
 @endsection

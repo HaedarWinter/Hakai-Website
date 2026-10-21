@@ -22,6 +22,7 @@ Tidak ada build frontend. Semua aset ada di `public/` dan dimuat langsung.
 - `app/Services/` - logika tugas dan statistik
 - `app/Policies/TugasPolicy.php` - aturan akses per tugas
 - `public/js/page/`, `public/css/` - aset halaman
+- `public/js/page/tugas/shared.js` - tabel tugas, detail, komentar, pratinjau
 - `public/sw.js` - service worker PWA
 
 ## Setup
@@ -74,8 +75,7 @@ php artisan optimize:clear       # setelah mengubah config/route
 
 - Endpoint daftar memakai `per_page` dengan batas 1000. Halaman admin meminta
   1000 baris; bila data melewati batas itu, UI perlu dipindah ke paginasi server.
-- Tabel `notifications` adalah sisa kanal database lama. Kanal sudah dihapus dari
-  semua kelas notifikasi; tabel boleh dibersihkan saat migrasi berikutnya.
-- Blok JavaScript karyawan pada `resources/views/karyawan/tugas/index.blade.php`
-  masih menduplikasi sebagian `public/js/page/admin/tugas/index.js`. Ekstraksi ke
-  satu berkas bersama belum dilakukan karena berisiko tanpa uji browser.
+- Tabel `notifications` sudah dihapus lewat migration; semua notifikasi memakai
+  kanal `mail`.
+- Logika bersama halaman tugas (tabel, detail, komentar, pratinjau file) ada di
+  `public/js/page/tugas/shared.js` dan dipakai halaman admin serta karyawan.

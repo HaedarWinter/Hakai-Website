@@ -480,18 +480,19 @@
 @endsection
 @section('scripts')
     <script src="{{ asset('js/export-handler.js') }}"></script>
+    <script src="{{ asset('js/page/tugas/shared.js') }}"></script>
     <script>
         $(document).ready(function () {
-            // Custom File Input Label
-            $(".custom-file-input").on("change", function () {
-                var fileName = $(this).val().split("\\").pop();
-                $(this).siblings(".custom-file-label").addClass("selected").html(fileName);
-            });
-            // Initialize DataTable
+            const { renderTaskDetail, bindGlobalSearch, initComments, initPreviewToggle, bindFileInputLabel } = window.HakaiTugas;
+
+            bindFileInputLabel();
+            const comments = initComments();
+            initPreviewToggle();
+
             const taskTable = $('#taskTable').DataTable({
                 scrollX: true,
-                responsive: false, // Force horizontal scroll instead of collapsing
-                autoWidth: false, // Respect explicit widths
+                responsive: false,
+                autoWidth: false,
                 pageLength: 10,
                 language: {
                     url: '{{ asset("json/datatables-indonesian.json") }}'
@@ -499,7 +500,7 @@
                 columnDefs: [
                     { targets: 0, orderable: false, className: 'col-no d-none d-md-table-cell text-center', width: '50px' },
                     { targets: 1, orderable: false, className: 'col-checkbox text-center', width: '40px' },
-                    { targets: 2, className: 'col-tugas' }, // Flexible width
+                    { targets: 2, className: 'col-tugas' },
                     { targets: 3, className: 'col-periode text-center', width: '160px' },
                     { targets: 4, className: 'col-file-admin text-center', width: '100px' },
                     { targets: 5, className: 'col-file-employee text-center', width: '100px' },
@@ -517,33 +518,30 @@
                     }).replaceWith('<i class="fas fa-search fa-sm"></i>');
                 }
             });
-            // Connect Global Search Input to DataTable
-            $('#globalSearchInput').on('keyup', function () {
-                taskTable.search(this.value).draw();
-            });
-            // Helper function to format datetime
-            function formatDateTime(dateString) {
-                if (!dateString) return '-';
-                try {
-                    let date;
-                    if (dateString.includes('T')) {
-                        date = new Date(dateString);
-                    } else {
-                        date = new Date(dateString.replace(' ', 'T'));
-                    }
-                    if (isNaN(date.getTime())) return dateString;
-                    const day = date.getDate();
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-                    const month = months[date.getMonth()];
-                    const year = date.getFullYear();
-                    const hours = String(date.getHours()).padStart(2, '0');
-                    const minutes = String(date.getMinutes()).padStart(2, '0');
-                    return `${day} ${month} ${year}, ${hours}:${minutes}`;
-                } catch (error) {
-                    return dateString;
+
+            bindGlobalSearch(taskTable);
+
+            const formatDateTime = window.HakaiTugas.formatDateTime;
+
+            function statusMeta(task) {
+                if (task.status === 'approved') {
+                    return { label: 'Disetujui', className: 'success', icon: 'fa-check-circle', bucket: 'selesai', action: 'detail' };
                 }
+                if (task.status === 'submitted') {
+                    return { label: 'Menunggu Persetujuan', className: 'info', icon: 'fa-clock', bucket: 'proses', action: 'detail' };
+                }
+                if (task.status === 'rejected') {
+                    return { label: 'Ditolak', className: 'danger', icon: 'fa-times-circle', bucket: 'proses', action: 'upload' };
+                }
+                return { label: 'Pending', className: 'warning', icon: 'fa-exclamation-circle', bucket: 'pending', action: 'upload' };
             }
-            // Load Tasks
+
+            function actionButtons(task, meta) {
+                const detail = `<button class="btn btn-info btn-sm shadow-sm btn-detail" data-id="${task.id}" title="Detail"><i class="fas fa-eye"></i></button>`;
+                if (meta.action !== 'upload') return detail;
+                return `<button class="btn btn-primary btn-sm shadow-sm btn-upload" data-id="${task.id}" title="Upload"><i class="fas fa-upload"></i></button>${detail}`;
+            }
+
             function loadTasks() {
                 $.ajax({
                     url: "/api/tugas?per_page=1000",
@@ -551,97 +549,76 @@
                     dataType: "json",
                     cache: false,
                     success: function (res) {
-                        if (res.success) {
-                            taskTable.clear();
-                            let stats = { total: 0, selesai: 0, proses: 0, pending: 0 };
-                            let dataRows = [];
-                            $.each(res.data, function (index, task) {
-                                stats.total++;
-                                let statusBadge = '';
-                                let statusClass = '';
-                                let actionBtn = '';
-                                if (task.status === 'approved') {
-                                    statusBadge = 'Disetujui'; statusClass = 'success'; stats.selesai++;
-                                    iconClass = 'fa-check-circle';
-                                    actionBtn = `<button class="btn btn-info btn-sm shadow-sm btn-detail" data-id="${task.id}" title="Detail"><i class="fas fa-eye"></i></button>`;
-                                } else if (task.status === 'submitted') {
-                                    statusBadge = 'Menunggu Persetujuan'; statusClass = 'info'; stats.proses++;
-                                    iconClass = 'fa-clock';
-                                    actionBtn = `<button class="btn btn-info btn-sm shadow-sm btn-detail" data-id="${task.id}" title="Detail"><i class="fas fa-eye"></i></button>`;
-                                } else if (task.status === 'rejected') {
-                                    statusBadge = 'Ditolak'; statusClass = 'danger'; stats.proses++;
-                                    iconClass = 'fa-times-circle';
-                                    actionBtn = `<button class="btn btn-primary btn-sm shadow-sm btn-upload" data-id="${task.id}" title="Upload Ulang"><i class="fas fa-upload"></i></button>
-                                                                                                                                                                                                          <button class="btn btn-info btn-sm shadow-sm btn-detail" data-id="${task.id}" title="Detail"><i class="fas fa-eye"></i></button>`;
-                                } else {
-                                    statusBadge = 'Pending'; statusClass = 'warning'; stats.pending++;
-                                    iconClass = 'fa-exclamation-circle';
-                                    actionBtn = `<button class="btn btn-primary btn-sm shadow-sm btn-upload" data-id="${task.id}" title="Upload"><i class="fas fa-upload"></i></button>
-                                                                                                                                                                                                          <button class="btn btn-info btn-sm shadow-sm btn-detail" data-id="${task.id}" title="Detail"><i class="fas fa-eye"></i></button>`;
-                                }
-                                const formattedStartDate = formatDateTime(task.tanggal_mulai);
-                                const formattedEndDate = formatDateTime(task.tanggal_selesai);
-                                // Checkbox cell for selection mode
-                                const checkboxCell = `<div class="custom-control custom-checkbox d-inline-block">
-                                                                                                                                                                                                                <input type="checkbox" class="custom-control-input task-checkbox" id="task-${task.id}" data-id="${task.id}">
-                                                                                                                                                                                                                <label class="custom-control-label" for="task-${task.id}"></label>
-                                                                                                                                                                                                              </div>`;
-                                dataRows.push([
-                                    index + 1,
-                                    checkboxCell,
-                                    `<a href="javascript:void(0)" class="task-link btn-detail" data-id="${task.id}">
-                                                                                                                                                                                                <div class="task-title" title="${task.tugas}">${task.tugas}</div>
-                                                                                                                                                                                            </a>`,
-                                    `<div class="text-center small">
-                                                                                                                                                                                                <div class="text-nowrap"><i class="fas fa-calendar-alt text-gray-400 mr-1"></i> ${formattedStartDate}</div>
-                                                                                                                                                                                                <div class="text-nowrap"><i class="fas fa-calendar-check text-gray-400 mr-1"></i> ${formattedEndDate}</div>
-                                                                                                                                                                                            </div>`,
-                                    `<div class="text-center">${task.tugas_file ? `<a href="/storage/${task.tugas_file}" target="_blank" class="btn btn-sm btn-outline-primary shadow-sm"><i class="fas fa-file-download"></i></a>` : '<span class="text-muted small">-</span>'}</div>`,
-                                    `<div class="text-center">${task.karyawan_file ? `<a href="/storage/${task.karyawan_file}" target="_blank" class="btn btn-sm btn-outline-success shadow-sm"><i class="fas fa-check-double mr-1"></i> Terkirim</a>` : '<span class="text-muted small">Belum ada</span>'}</div>`,
-                                    `<span class="status-pill-premium status-pill-${statusClass}"><i class="fas ${iconClass}"></i> ${statusBadge}</span>`,
-                                    actionBtn
-                                ]);
-                            });
-                            taskTable.rows.add(dataRows).draw();
-                            $('#total-tugas').text(stats.total);
-                            $('#total-selesai').text(stats.selesai);
-                            $('#total-proses').text(stats.proses);
-                            $('#total-pending').text(stats.pending);
-                        }
+                        if (!res.success) return;
+
+                        taskTable.clear();
+                        const stats = { total: 0, selesai: 0, proses: 0, pending: 0 };
+                        const rows = [];
+
+                        res.data.forEach(function (task, index) {
+                            const meta = statusMeta(task);
+                            stats.total++;
+                            stats[meta.bucket]++;
+
+                            rows.push([
+                                index + 1,
+                                `<div class="custom-control custom-checkbox d-inline-block">
+                                    <input type="checkbox" class="custom-control-input task-checkbox" id="task-${task.id}" data-id="${task.id}">
+                                    <label class="custom-control-label" for="task-${task.id}"></label>
+                                </div>`,
+                                `<a href="javascript:void(0)" class="task-link btn-detail" data-id="${task.id}">
+                                    <div class="task-title" title="${task.tugas}">${task.tugas}</div>
+                                </a>`,
+                                `<div class="text-center small">
+                                    <div class="text-nowrap"><i class="fas fa-calendar-alt text-gray-400 mr-1"></i> ${formatDateTime(task.tanggal_mulai)}</div>
+                                    <div class="text-nowrap"><i class="fas fa-calendar-check text-gray-400 mr-1"></i> ${formatDateTime(task.tanggal_selesai)}</div>
+                                </div>`,
+                                `<div class="text-center">${task.tugas_file ? `<a href="/storage/${task.tugas_file}" target="_blank" class="btn btn-sm btn-outline-primary shadow-sm"><i class="fas fa-file-download"></i></a>` : '<span class="text-muted small">-</span>'}</div>`,
+                                `<div class="text-center">${task.karyawan_file ? `<a href="/storage/${task.karyawan_file}" target="_blank" class="btn btn-sm btn-outline-success shadow-sm"><i class="fas fa-check-double mr-1"></i> Terkirim</a>` : '<span class="text-muted small">Belum ada</span>'}</div>`,
+                                `<span class="status-pill-premium status-pill-${meta.className}"><i class="fas ${meta.icon}"></i> ${meta.label}</span>`,
+                                actionButtons(task, meta)
+                            ]);
+                        });
+
+                        taskTable.rows.add(rows).draw();
+                        $('#total-tugas').text(stats.total);
+                        $('#total-selesai').text(stats.selesai);
+                        $('#total-proses').text(stats.proses);
+                        $('#total-pending').text(stats.pending);
                     },
                     error: function (xhr) {
                         console.error('Error loading tasks:', xhr);
                     }
                 });
             }
-            // Filter Logic
+
             $('#filter-status').on('change', function () {
-                let status = $(this).val();
-                let table = $('#taskTable').DataTable();
-                table.column(6).search(status ? (
-                    status === 'pending' ? 'Pending' :
-                        status === 'submitted' ? 'Menunggu Persetujuan' :
-                            status === 'approved' ? 'Disetujui' :
-                                status === 'rejected' ? 'Ditolak' : ''
-                ) : '').draw();
+                const labels = {
+                    pending: 'Pending',
+                    submitted: 'Menunggu Persetujuan',
+                    approved: 'Disetujui',
+                    rejected: 'Ditolak'
+                };
+                taskTable.column(6).search(labels[$(this).val()] || '').draw();
             });
+
             $('#reset-filter').on('click', function () {
                 $('#filter-status, #filter-priority').val('');
-                let table = $('#taskTable').DataTable();
-                table.search('').columns().search('').draw();
+                taskTable.search('').columns().search('').draw();
             });
-            // UPLOAD FILE
+
             $(document).on('click', '.btn-upload', function () {
-                let taskId = $(this).data('id');
-                $('#upload-task-id').val(taskId);
+                $('#upload-task-id').val($(this).data('id'));
                 $('#modalUploadFile').modal('show');
             });
+
             $('#form-upload-file').on('submit', function (e) {
                 e.preventDefault();
-                let taskId = $('#upload-task-id').val();
-                let formData = new FormData(this);
+                const taskId = $('#upload-task-id').val();
+                const formData = new FormData(this);
                 const $submitBtn = $(this).find('button[type="submit"]');
                 $submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-1"></span> Mengupload...');
+
                 $.ajax({
                     url: "/api/tugas/" + taskId + "/upload",
                     type: "POST",
@@ -663,269 +640,88 @@
                     }
                 });
             });
-            // TASK DETAIL
+
             $(document).on('click', '.btn-detail', function () {
-                let taskId = $(this).data('id');
+                const taskId = $(this).data('id');
                 Swal.showLoading();
                 $.ajax({
                     url: "/api/tugas/" + taskId,
                     type: "GET",
                     success: function (res) {
-                        if (res.success) {
-                            let t = res.data;
-                            let statusBadge = t.status === 'approved' ? '<span class="status-pill-premium status-approved">Disetujui</span>' :
-                                t.status === 'submitted' ? '<span class="status-pill-premium status-submitted">Menunggu Persetujuan</span>' :
-                                    t.status === 'rejected' ? '<span class="status-pill-premium status-rejected">Ditolak</span>' :
-                                        '<span class="status-pill-premium status-pending">Pending</span>';
-                            // Helper to generate file preview
-                            function getFilePreview(fileName, label) {
-                                if (!fileName) return '';
-                                let fileExt = fileName.split('.').pop().toLowerCase();
-                                let filePath = '/storage/' + fileName;
-                                let previewId = 'preview-' + Math.random().toString(36).substr(2, 9);
-                                let content = '';
-                                if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExt)) {
-                                    content = `<img src="${filePath}" class="img-fluid " style="max-height: 500px; width: 100%; object-fit: contain; background: #0f172a;" alt="Preview">`;
-                                } else if (fileExt === 'pdf') {
-                                    content = `<div class="embed-responsive embed-responsive-16by9" style="height: 500px;"><iframe class="embed-responsive-item" src="${filePath}" allowfullscreen></iframe></div>`;
-                                }
-                                if (!content) return '';
-                                return `
-                                                                                                                                                    <div class="row align-items-center mb-3 animate-in">
-                                                                                                                                                        <div class="col-12">
-                                                                                                                                                            <div class="p-3 bg-light rounded border-dashed d-flex align-items-center justify-content-between">
-                                                                                                                                                                <div class="d-flex align-items-center">
-                                                                                                                                                                    <div class="bg-primary-light p-2 rounded mr-3">
-                                                                                                                                                                        <i class="fas fa-eye text-primary"></i>
-                                                                                                                                                                    </div>
-                                                                                                                                                                    <div>
-                                                                                                                                                                        <div class="small font-weight-bold text-dark">${label}</div>
-                                                                                                                                                                        <div class="text-xs text-muted">Pratinjau Dokumen</div>
-                                                                                                                                                                    </div>
-                                                                                                                                                                </div>
-                                                                                                                                                                <button class="btn btn-preview-toggle" type="button" data-toggle-id="${previewId}">
-                                                                                                                                                                    <i class="fas fa-eye"></i> <span>Lihat Pratinjau</span>
-                                                                                                                                                                </button>
-                                                                                                                                                            </div>
-                                                                                                                                                            <div id="${previewId}" class="preview-collapse">
-                                                                                                                                                                <div class="preview-card mt-3 shadow-sm">
-                                                                                                                                                                    <div class="preview-header ">
-                                                                                                                                                             <span><i class="fas fa-search mr-2"></i>Pratinjau File</span>
-                                                                                                                                                             <div class="mode-label">Mode Tampilan</div>
-                                                                                                                                                         </div>
-                                                                                                                                                                    <div class="preview-body p-0 bg-dark">
-                                                                                                                                                                        ${content}
-                                                                                                                                                                    </div>
-                                                                                                                                                                </div>
-                                                                                                                                                            </div>
-                                                                                                                                                        </div>
-                                                                                                                                                    </div>
-                                                                                                                                                `;
-                            }
-                            // Generate Previews
-                            let adminPreview = getFilePreview(t.tugas_file, 'File Instruksi Admin');
-                            let employeePreview = getFilePreview(t.karyawan_file, 'Laporan Saya');
-                            let filePreview = adminPreview + employeePreview;
-                            function getFileCard(fileName, label, colorClass, iconClass) {
-                                if (!fileName) return '';
-                                return `
-                                                                                                                                                    <div class="attachment-card-v2 p-3 rounded border bg-white shadow-sm hover-lift mb-3 animate-in">
-                                                                                                                                                        <div class="attachment-icon-v2 bg-light text-${colorClass} mr-3">
-                                                                                                                                                            <i class="${iconClass}"></i>
-                                                                                                                                                        </div>
-                                                                                                                                                        <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
-                                                                                                                                                            <div class="small font-weight-bold text-dark text-truncate">${label}</div>
-                                                                                                                                                            <div class="text-xs text-muted text-truncate">${fileName.split('/').pop()}</div>
-                                                                                                                                                        </div>
-                                                                                                                                                        <div class="ml-2">
-                                                                                                                                                            <a href="/storage/${fileName}" target="_blank" class="btn btn-icon-only btn-light shadow-sm" title="Download">
-                                                                                                                                                                <i class="fas fa-download text-primary"></i>
-                                                                                                                                                            </a>
-                                                                                                                                                        </div>
-                                                                                                                                                    </div>
-                                                                                                                                                `;
-                            }
-                            let adminFileCard = getFileCard(t.tugas_file, 'Instruksi Admin', 'primary', 'fas fa-file-alt');
-                            let employeeFileCard = getFileCard(t.karyawan_file, 'Laporan Saya', 'success', 'fas fa-file-upload');
-                            let detailHtml = `
-                                                                                                                                                <div class="px-4 py-4">
-                                                                                                                                                    <!-- Task Header Info -->
-                                                                                                                                                    <div class="mb-4 pb-3 border-bottom">
-                                                                                                                                                        <div class="d-flex align-items-center mb-2">
-                                                                                                                                                            <span class="badge badge-primary-light text-primary px-2 py-1 mr-2" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase;">ID: #${t.id}</span>
-                                                                                                                                                            ${t.priority ? `
-                                                                                                                                                                <span class="badge badge-${t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'secondary'}-light text-${t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'secondary'} px-2 py-1" style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase;">
-                                                                                                                                                                    <i class="fas fa-flag mr-1"></i> Prioritas ${t.priority === 'high' ? 'Tinggi' : t.priority === 'medium' ? 'Sedang' : 'Rendah'}
-                                                                                                                                                                </span>
-                                                                                                                                                            ` : ''}
-                                                                                                                                                        </div>
-                                                                                                                                                        <h4 class="font-weight-bold text-dark mb-1" title="${t.tugas}">${t.tugas.length > 100 ? t.tugas.substring(0, 100) + '...' : t.tugas}</h4>
-                                                                                                                                                <p class="text-xs text-muted mb-0"><i class="far fa-calendar-alt mr-1"></i> Dibuat pada ${formatDateTime(t.created_at)}</p>
-                                                                                                                                            </div>
-                                                                                                                                            <!-- Top Section: Creator & Status -->
-                                                                                                                                            <div class="row mb-5">
-                                                                                                                                                <div class="col-md-7 mb-3 mb-md-0">
-                                                                                                                                                    <span class="detail-section-label">Pembuat Tugas</span>
-                                                                                                                                                    <div class="info-card p-3 d-flex align-items-center h-100">
-                                                                                                                                                        <div class="mr-3 position-relative">
-                                                                                                                                                            <img class="img-profile rounded-circle shadow-sm border" 
-                                                                                                                                                                 style="width: 54px; height: 54px; object-fit: cover;"
-                                                                                                                                                                 src="${t.creator ? (t.creator.profile_photo_path ? '/storage/' + t.creator.profile_photo_path : '{{ asset('sbadmin2/img/undraw_profile.svg') }}') : '{{ asset('sbadmin2/img/undraw_profile.svg') }}'
-                                }"
-                                                                                                                                                                 alt = "Profile" >
-                                        <div class="position-absolute" style="bottom: -2px; right: -2px;">
-                                            <div class="bg-primary rounded-circle border border-white" style="width: 12px; height: 12px;"></div>
-                                        </div>
-                                                                                                                                                        </div >
-                                        <div class="overflow-hidden">
-                                            <div class="font-weight-bold text-dark text-truncate" style="font-size: 1.05rem;">${t.creator ? t.creator.nama : 'N/A'}</div>
-                                            <div class="small text-muted text-truncate mb-1">${t.creator ? t.creator.email : '-'}</div>
-                                            <span class="badge badge-primary-light text-primary border text-xs px-2 py-1" style="border-radius: 4px;">Pemberi Tugas</span>
-                                        </div>
-                                                                                                                                                    </div >
-                                                                                                                                                </div >
-                                        <div class="col-md-5">
-                                            <span class="detail-section-label">Periode & Status</span>
-                                            <div class="info-card p-3 h-100">
-                                                <div class="d-flex justify-content-between mb-2">
-                                                    <div class="text-xs font-weight-bold text-muted"><i class="far fa-clock mr-1"></i> Mulai</div>
-                                                    <div class="small font-weight-bold text-dark">${formatDateTime(t.tanggal_mulai)}</div>
-                                                </div>
-                                                <div class="d-flex justify-content-between mb-3 pb-2 border-bottom">
-                                                    <div class="text-xs font-weight-bold text-muted"><i class="far fa-calendar-check mr-1"></i> Selesai</div>
-                                                    <div class="small font-weight-bold text-dark">${formatDateTime(t.tanggal_selesai)}</div>
-                                                </div>
-                                                <div class="d-flex align-items-center justify-content-between mt-2">
-                                                    <div class="text-xs font-weight-bold text-muted">Status</div>
-                                                    ${statusBadge}
-                                                </div>
-                                            </div>
-                                        </div>
-                                                                                                                                            </div >
-                                                                                                                                            <div class="row mb-5">
-                                                                                                                                                <div class="col-12">
-                                                                                                                                                    <span class="detail-section-label">Deskripsi Tugas</span>
-                                                                                                                                                    <div class="description-box shadow-sm">${(t.tugas ? t.tugas.trim() : '') || '<span class="text-muted italic">Tidak ada deskripsi tugas.</span>'}</div>
-                                                                                                                                                </div>
-                                                                                                                                            </div>
-                                                                                                                                            <div class="row mb-2">
-                                                                                                                                                <div class="col-12">
-                                                                                                                                                    <span class="detail-section-label">File Lampiran</span>
-                                                                                                                                                    <div class="row">
-                                                                                                                                                        <div class="col-md-6 mb-3 mb-md-0">
-                                                                                                                                                            ${adminFileCard ? adminFileCard : `
-                                                                                                                                                                <div class="p-3 bg-light rounded text-center text-muted small border-dashed h-100 d-flex align-items-center justify-content-center">
-                                                                                                                                                                    <div><i class="fas fa-file-circle-exclamation mr-1 opacity-5"></i> Tidak ada file instruksi</div>
-                                                                                                                                                                </div>
-                                                                                                                                                            `}
-                                                                                                                                                        </div>
-                                                                                                                                                        <div class="col-md-6">
-                                                                                                                                                            ${employeeFileCard ? employeeFileCard : `
-                                                                                                                                                                <div class="p-3 bg-light rounded text-center text-muted small border-dashed h-100 d-flex align-items-center justify-content-center">
-                                                                                                                                                                    <div><i class="fas fa-file-circle-exclamation mr-1 opacity-5"></i> Tidak ada file laporan</div>
-                                                                                                                                                                </div>
-                                                                                                                                                            `}
-                                                                                                                                                        </div>
-                                                                                                                                                    </div>
-                                                                                                                                                </div>
-                                                                                                                                            </div>
-                                        ${t.catatan ? `
-                                                                                                                                            <div class="row mt-3">
-                                                                                                                                                <div class="col-12">
-                                                                                                                                                    <div class="p-3 border-left border-danger bg-danger-light rounded shadow-sm" style="border-left-width: 4px !important;">
-                                                                                                                                                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Catatan Penolakan</div>
-                                                                                                                                                        <div class="text-dark small"><i class="fas fa-exclamation-circle mr-2"></i>${t.catatan}</div>
-                                                                                                                                                    </div>
-                                                                                                                                                </div>
-                                                                                                                                            </div>` : ''
-                                }
-                                        <div class="row mt-4">
-                                            <div class="col-12">
-                                                ${filePreview ? `
-                                                                                                                                                        <div class="preview-section">
-                                                                                                                                                            <div class="preview-header-wrapper d-flex align-items-center mb-3">
-                                                                                                                                                                <span class="detail-section-label mb-0 mr-auto">Pratinjau File</span>
-                                                                                                                                                            </div>
-                                                                                                                                                            ${filePreview}
-                                                                                                                                                        </div>
-                                                                                                                                                    ` : ''}
-                                            </div>
-                                        </div>
-                                                                                                                                        </div >
-                                        `;
-                            $('#task-detail-content').html(detailHtml);
-                            $('#modalDetailTask').modal('show');
-                            Swal.close();
-                            // Load comments
-                            loadComments(taskId);
-                        }
+                        if (!res.success) return;
+                        $('#task-detail-content').html(renderTaskDetail(res.data, {
+                            person: res.data.creator,
+                            personLabel: 'Pembuat Tugas',
+                            personBadge: 'Pemberi Tugas',
+                            personDotClass: 'bg-primary',
+                            employeeFileLabel: 'Laporan Saya',
+                            submittedLabel: 'Menunggu Persetujuan'
+                        }));
+                        $('#modalDetailTask').modal('show');
+                        Swal.close();
+                        comments.load(taskId);
+                    },
+                    error: function () {
+                        Swal.fire({ icon: 'error', title: 'Gagal!', text: 'Tidak dapat memuat data tugas' });
                     }
                 });
             });
-            loadTasks();
-            // Selection Mode Variables
-            let selectionMode = false;
+
             let selectedTasks = [];
-            // Toggle Selection Mode
-            $('#toggle-selection-mode').on('click', function () {
-                selectionMode = !selectionMode;
-                if (selectionMode) {
-                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                    $('#taskTable').addClass('selection-mode');
-                    $('#bulk-actions-bar').slideDown();
-                } else {
-                    $(this).removeClass('btn-primary').addClass('btn-outline-primary');
-                    $('#taskTable').removeClass('selection-mode');
-                    $('#bulk-actions-bar').slideUp();
-                    clearSelection();
-                }
-                // No need for loadTasks() here as the class handles visibility
-                taskTable.columns.adjust().draw();
-            });
-            // Clear Selection
+
+            function updateSelectedCount() {
+                $('#selected-count').text(selectedTasks.length);
+            }
+
             function clearSelection() {
                 selectedTasks = [];
                 $('#select-all-tasks').prop('checked', false);
                 $('.task-checkbox').prop('checked', false);
                 updateSelectedCount();
             }
-            $('#clear-selection').on('click', function () {
-                clearSelection();
+
+            $('#toggle-selection-mode').on('click', function () {
+                const $table = $('#taskTable');
+                const active = !$table.hasClass('selection-mode');
+
+                $(this).toggleClass('btn-primary', active).toggleClass('btn-outline-primary', !active);
+                $table.toggleClass('selection-mode', active);
+                $('#bulk-actions-bar').stop(true, true)[active ? 'slideDown' : 'slideUp']();
+
+                if (!active) clearSelection();
+                taskTable.columns.adjust().draw();
             });
-            // Update Selected Count
-            function updateSelectedCount() {
-                $('#selected-count').text(selectedTasks.length);
-            }
-            // Select All Tasks
+
+            $('#clear-selection').on('click', clearSelection);
+
             $(document).on('change', '#select-all-tasks', function () {
-                const isChecked = $(this).prop('checked');
-                $('.task-checkbox').prop('checked', isChecked);
+                const checked = $(this).prop('checked');
+                $('.task-checkbox').prop('checked', checked);
                 selectedTasks = [];
-                if (isChecked) {
+                if (checked) {
                     $('.task-checkbox').each(function () {
                         selectedTasks.push($(this).data('id'));
                     });
                 }
                 updateSelectedCount();
             });
-            // Individual Task Checkbox
+
             $(document).on('change', '.task-checkbox', function () {
                 const taskId = $(this).data('id');
                 if ($(this).prop('checked')) {
-                    if (!selectedTasks.includes(taskId)) {
-                        selectedTasks.push(taskId);
-                    }
+                    if (!selectedTasks.includes(taskId)) selectedTasks.push(taskId);
                 } else {
                     selectedTasks = selectedTasks.filter(id => id !== taskId);
                 }
                 updateSelectedCount();
             });
-            // Bulk Delete
+
             $('#bulk-delete').on('click', function () {
                 if (selectedTasks.length === 0) {
                     Swal.fire('Perhatian', 'Pilih tugas terlebih dahulu', 'warning');
                     return;
                 }
+
                 Swal.fire({
                     title: 'Hapus Tugas?',
                     text: `${selectedTasks.length} tugas akan dipindahkan ke sampah.`,
@@ -935,261 +731,23 @@
                     cancelButtonColor: '#858796',
                     confirmButtonText: 'Ya, Hapus!',
                     cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        let completed = 0;
-                        selectedTasks.forEach(taskId => {
-                            $.ajax({
-                                url: `/api/tugas/${taskId}`,
-                                type: 'DELETE',
-                                headers: {
-                                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                                },
-                                success: function () {
-                                    completed++;
-                                    if (completed === selectedTasks.length) {
-                                        Swal.fire('Berhasil!', 'Tugas dipindahkan ke sampah', 'success');
-                                        clearSelection();
-                                        loadTasks();
-                                    }
-                                }
-                            });
-                        });
-                    }
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+
+                    Promise.all(selectedTasks.map(function (taskId) {
+                        return $.ajax({ url: `/api/tugas/${taskId}`, type: 'DELETE' });
+                    })).then(function () {
+                        Swal.fire('Berhasil!', 'Tugas dipindahkan ke sampah', 'success');
+                        clearSelection();
+                        loadTasks();
+                    }).catch(function () {
+                        Swal.fire('Gagal!', 'Sebagian tugas gagal dihapus.', 'error');
+                        loadTasks();
+                    });
                 });
             });
-            // ==================== COMMENTS FUNCTIONALITY ====================
-            let currentTaskId = null;
-            let replyingToId = null;
-            function loadComments(taskId) {
-                currentTaskId = taskId;
-                replyingToId = null;
-                $('#comments-section').show();
-                $('#comments-list').html('<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></div>');
-                $.ajax({
-                    url: `/api/tugas/${taskId}/comments`,
-                    type: 'GET',
-                    cache: false,
-                    success: function (res) {
-                        if (res.success) {
-                            renderComments(res.data);
-                        }
-                    },
-                    error: function () {
-                        $('#comments-list').html('<div class="text-center text-danger py-3"><i class="fas fa-exclamation-circle"></i> Gagal memuat komentar</div>');
-                    }
-                });
-            }
-            function countAllComments(comments) {
-                let count = comments.length;
-                comments.forEach(c => {
-                    if (c.replies && c.replies.length > 0) {
-                        count += countAllComments(c.replies);
-                    }
-                });
-                return count;
-            }
-            function renderComments(comments) {
-                const totalCount = countAllComments(comments);
-                $('#comments-count').text(totalCount);
-                if (comments.length === 0) {
-                    $('#comments-list').html(`
-                                                                                                                                                                                                                    <div class="text-center text-muted py-3" id="no-comments">
-                                                                                                                                                                                                                        <i class="fas fa-comment-slash fa-2x mb-2"></i>
-                                                                                                                                                                                                                        <p class="mb-0">Belum ada komentar</p>
-                                                                                                                                                                                                                    </div>
-                                                                                                                                                                                                                `);
-                    return;
-                }
-                let html = renderCommentItems(comments, 0);
-                $('#comments-list').html(html);
-                $('#comments-list').scrollTop($('#comments-list')[0].scrollHeight);
-            }
-            function renderCommentItems(comments, depth) {
-                let html = '';
-                const marginLeft = depth > 0 ? (depth * 20) : 0;
-                const bgClass = depth > 0 ? 'comment-reply' : '';
-                comments.forEach(function (c) {
-                    const initial = c.user.nama.charAt(0).toUpperCase();
-                    const avatarHtml = c.user.photo
-                        ? `<img src="${c.user.photo}" alt="${c.user.nama}">`
-                        : initial;
-                    html += `
-                                                                                                                                                                                                                    <div class="comment-item ${bgClass}" data-id="${c.id}" style="margin-left: ${marginLeft}px;">
-                                                                                                                                                                                                                        <div class="comment-header">
-                                                                                                                                                                                                                            <div class="comment-avatar">${avatarHtml}</div>
-                                                                                                                                                                                                                            <div class="comment-meta">
-                                                                                                                                                                                                                                <div class="comment-author">${c.user.nama}</div>
-                                                                                                                                                                                                                                <div class="comment-time">${c.created_at_human}</div>
-                                                                                                                                                                                                                            </div>
-                                                                                                                                                                                                                            <div class="comment-actions">
-                                                                                                                                                                                                                                <button class="btn btn-sm btn-link text-primary btn-reply-comment p-0 mr-2" 
-                                                                                                                                                                                                                                        data-id="${c.id}" data-name="${c.user.nama}" title="Balas">
-                                                                                                                                                                                                                                    <i class="fas fa-reply"></i>
-                                                                                                                                                                                                                                </button>
-                                                                                                                                                                                                                                ${c.is_own ? `
-                                                                                                                                                                                                                                    <button class="btn btn-sm btn-link text-danger btn-delete-comment p-0" data-id="${c.id}" title="Hapus">
-                                                                                                                                                                                                                                        <i class="fas fa-trash-alt"></i>
-                                                                                                                                                                                                                                    </button>
-                                                                                                                                                                                                                                ` : ''}
-                                                                                                                                                                                                                            </div>
-                                                                                                                                                                                                                        </div>
-                                                                                                                                                                                                                        <div class="comment-content">${c.content}</div>
-                                                                                                                                                                                                                    </div>
-                                                                                                                                                                                                                `;
-                    // Render nested replies recursively
-                    if (c.replies && c.replies.length > 0 && depth < 2) {
-                        html += renderCommentItems(c.replies, depth + 1);
-                    }
-                });
-                return html;
-            }
-            // Handle reply button click
-            $(document).on('click', '.btn-reply-comment', function () {
-                const commentId = $(this).data('id');
-                const userName = $(this).data('name');
-                replyingToId = commentId;
-                // Update input placeholder and show indicator
-                $('#comment-input')
-                    .attr('placeholder', `Balas ke ${userName}...`)
-                    .focus();
-                // Add cancel reply button if not already present
-                if ($('#cancel-reply').length === 0) {
-                    $('#add-comment-form .input-group').prepend(`
-                                                                                                                                                                                                                    <div class="input-group-prepend">
-                                                                                                                                                                                                                        <button type="button" class="btn btn-outline-secondary" id="cancel-reply" title="Batal balas">
-                                                                                                                                                                                                                            <i class="fas fa-times"></i>
-                                                                                                                                                                                                                        </button>
-                                                                                                                                                                                                                    </div>
-                                                                                                                                                                                                                `);
-                }
-            });
-            // Cancel reply
-            $(document).on('click', '#cancel-reply', function () {
-                replyingToId = null;
-                $('#comment-input').attr('placeholder', 'Tulis komentar...').val('');
-                $(this).parent().remove();
-            });
-            // Add comment form submit (with reply support)
-            $('#add-comment-form').on('submit', function (e) {
-                e.preventDefault();
-                const content = $('#comment-input').val().trim();
-                if (!content || !currentTaskId) return;
-                const $btn = $('#submit-comment');
-                $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
-                const postData = { content: content };
-                if (replyingToId) {
-                    postData.parent_id = replyingToId;
-                }
-                $.ajax({
-                    url: `/api/tugas/${currentTaskId}/comments`,
-                    type: 'POST',
-                    data: postData,
-                    success: function (res) {
-                        if (res.success) {
-                            $('#comment-input').val('').attr('placeholder', 'Tulis komentar...');
-                            $('#cancel-reply').parent().remove();
-                            replyingToId = null;
-                            loadComments(currentTaskId);
-                        }
-                    },
-                    error: function (xhr) {
-                        if (xhr.status === 419 || xhr.status === 401) {
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Sesi Berakhir',
-                                text: 'Sesi anda telah berakhir. Halaman akan dimuat ulang.',
-                                timer: 2000,
-                                showConfirmButton: false
-                            }).then(() => {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Gagal',
-                                text: xhr.responseJSON?.message || 'Gagal menambah komentar'
-                            });
-                        }
-                    },
-                    complete: function () {
-                        $btn.prop('disabled', false).html('<i class="fas fa-paper-plane"></i>');
-                    }
-                });
-            });
-            // Delete comment
-            $(document).on('click', '.btn-delete-comment', function () {
-                const commentId = $(this).data('id');
-                Swal.fire({
-                    title: 'Hapus Komentar?',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Ya, Hapus',
-                    cancelButtonText: 'Batal'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        $.ajax({
-                            url: `/api/tugas/comments/${commentId}`,
-                            type: 'DELETE',
-                            success: function () {
-                                loadComments(currentTaskId);
-                            },
-                            error: function (xhr) {
-                                if (xhr.status === 404) {
-                                    // If 404, comment is already deleted, just reload
-                                    loadComments(currentTaskId);
-                                } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Gagal',
-                                        text: xhr.responseJSON?.message || 'Gagal menghapus komentar'
-                                    });
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-            // Reset comments when modal closes
-            $('#modalDetailTask').on('hidden.bs.modal', function () {
-                currentTaskId = null;
-                replyingToId = null;
-                $('#comments-section').hide();
-                $('#comments-list').html('');
-                $('#comment-input').val('').attr('placeholder', 'Tulis komentar...');
-                $('#cancel-reply').parent().remove();
-            });
-            // Hook into detail modal show
-            $('#modalDetailTask').on('shown.bs.modal', function () {
-                const taskId = $('.btn-detail:focus').data('id') || currentTaskId;
-                if (taskId) {
-                    loadComments(taskId);
-                }
-            });
-            // Preview Toggle Logic
-            $(document).on('click', '.btn-preview-toggle', function () {
-                const targetId = $(this).data('toggle-id');
-                const $target = $('#' + targetId);
-                const $btn = $(this);
-                const $icon = $btn.find('i');
-                const $text = $btn.find('span');
-                const $containerIcon = $btn.closest('.preview-toggle-container').find('.text-primary');
-                if ($target.hasClass('show')) {
-                    $target.removeClass('show');
-                    $btn.removeClass('active');
-                    $icon.removeClass('fa-eye-slash').addClass('fa-eye');
-                    $text.text('Tampilkan');
-                    $containerIcon.removeClass('fa-eye').addClass('fa-eye-slash');
-                } else {
-                    $target.addClass('show');
-                    $btn.addClass('active');
-                    $icon.removeClass('fa-eye').addClass('fa-eye-slash');
-                    $text.text('Sembunyikan');
-                    $containerIcon.removeClass('fa-eye-slash').addClass('fa-eye');
-                }
-            });
+
+            loadTasks();
         });
     </script>
     <style>
