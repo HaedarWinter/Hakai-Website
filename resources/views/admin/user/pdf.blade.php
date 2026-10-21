@@ -105,7 +105,7 @@
         <th>Nama Lengkap</th>
         <th>Email</th>
         <th>Jabatan</th>
-        <th>Status Penugasan</th>
+        <th>Status</th>
         <th>Keterangan</th>
     </tr>
     </thead>
@@ -125,20 +125,14 @@
             <td>
                 @if(strtolower($item->jabatan ?? '') === 'admin')
                     <span class="label-admin">Menugaskan</span>
+                @elseif($item->last_seen && $item->last_seen->gt(now()->subMinutes(5)))
+                    <span class="done">Online</span>
                 @else
-                    @if($item->is_tugas)
-                        <span class="done">Sudah Ditugaskan</span>
-                    @else
-                        <span class="pending">Belum Ditugaskan</span>
-                    @endif
+                    <span class="pending">Offline</span>
                 @endif
             </td>
             <td>
-                @if(isset($item->tanggal_tugas))
-                    {{ \Carbon\Carbon::parse($item->tanggal_tugas)->format('d/m/Y') }}
-                @else
-                    -
-                @endif
+                {{ $item->last_seen ? $item->last_seen->format('d/m/Y H:i') : '-' }}
             </td>
         </tr>
     @empty

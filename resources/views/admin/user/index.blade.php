@@ -248,24 +248,24 @@
                                     ? `<span class="status-pill-premium status-pill-success">Admin</span> ${superAdminBadge}`
                                     : '<span class="status-pill-premium status-pill-warning">Karyawan</span>';
 
-                                let statusBadge = '';
-                                if (user.jabatan === 'Admin') {
-                                    statusBadge = '<span class="status-pill-premium status-pill-info"><i class="fas fa-user-shield"></i> Terverifikasi</span>';
-                                    totalAdmin++;
-                                } else {
-                                    statusBadge = user.is_tugas
-                                        ? '<span class="status-pill-premium status-pill-success"><i class="fas fa-laptop-code"></i> Aktif</span>'
-                                        : '<span class="status-pill-premium status-pill-secondary"><i class="fas fa-clock"></i> Idle</span>';
-                                    totalKaryawan++;
-                                    if (user.is_tugas) totalAktif++;
-                                }
-
                                 let isOnline = false;
                                 if (user.last_seen) {
                                     const lastSeen = new Date(user.last_seen);
                                     const now = new Date();
                                     const diff = (now - lastSeen) / 1000 / 60; // difference in minutes
                                     if (diff < 5) isOnline = true;
+                                }
+
+                                let statusBadge = '';
+                                if (user.jabatan === 'Admin') {
+                                    statusBadge = '<span class="status-pill-premium status-pill-info"><i class="fas fa-user-shield"></i> Terverifikasi</span>';
+                                    totalAdmin++;
+                                } else {
+                                    statusBadge = isOnline
+                                        ? '<span class="status-pill-premium status-pill-success"><i class="fas fa-laptop-code"></i> Aktif</span>'
+                                        : '<span class="status-pill-premium status-pill-secondary"><i class="fas fa-clock"></i> Idle</span>';
+                                    totalKaryawan++;
+                                    if (isOnline) totalAktif++;
                                 }
 
                                 let onlineStatus = isOnline

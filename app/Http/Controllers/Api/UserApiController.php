@@ -73,7 +73,6 @@ class UserApiController extends Controller
             'email' => $request->email,
             'jabatan' => $request->jabatan,
             'password' => Hash::make($request->password),
-            'is_tugas' => false,
         ]);
 
         return response()->json([

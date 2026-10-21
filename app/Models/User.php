@@ -18,7 +18,6 @@ class User extends Authenticatable
         'email',
         'jabatan',
         'password',
-        'is_tugas',
         'is_super_admin',
         'profile_photo_path',
         'last_seen',
@@ -37,7 +36,6 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'is_tugas' => 'boolean',
         'is_super_admin' => 'boolean',
         'deleted_at' => 'datetime',
         'last_seen' => 'datetime',
@@ -83,14 +81,6 @@ class User extends Authenticatable
     public function scopeEmployees($query)
     {
         return $query->where(\Illuminate\Support\Facades\DB::raw('LOWER(jabatan)'), 'karyawan');
-    }
-
-    /**
-     * Scope a query to only include active users.
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_tugas', true);
     }
 
     /**

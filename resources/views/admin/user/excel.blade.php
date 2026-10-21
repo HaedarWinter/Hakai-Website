@@ -65,7 +65,7 @@
                 <th align="center">Nama Lengkap</th>
                 <th align="center">Email</th>
                 <th align="center">Jabatan</th>
-                <th align="center">Status Penugasan</th>
+                <th align="center">Status</th>
                 <th align="center">Keterangan</th>
             </tr>
             </thead>
@@ -108,24 +108,18 @@
                         Menugaskan
                     </span>
                         </td>
-                    @else
-                    @if($item->is_tugas == true)
+                    @elseif($item->last_seen && $item->last_seen->gt(now()->subMinutes(5)))
                         <td align="center" style="background-color: #C8E6C9; color: #2E7D32; font-weight: bold;">
-                             Sudah Ditugaskan
+                             Online
                         </td>
-                        <td align="center">
-                            @if(isset($item->tanggal_tugas))
-                                 Sejak: {{ \Carbon\Carbon::parse($item->tanggal_tugas)->format('d/m/Y') }}
-                            @else
-                                Aktif
-                            @endif
-                        </td>
+                        <td align="center">Terakhir aktif: {{ $item->last_seen->format('d/m/Y H:i') }}</td>
                     @else
                         <td align="center" style="background-color: #FFCDD2; color: #C62828; font-weight: bold;">
-                             Belum Ditugaskan
+                             Offline
                         </td>
-                        <td align="center">Menunggu Penugasan</td>
-                    @endif
+                        <td align="center">
+                            {{ $item->last_seen ? 'Terakhir aktif: '.$item->last_seen->format('d/m/Y H:i') : 'Belum pernah masuk' }}
+                        </td>
                     @endif
                 </tr>
             @empty
