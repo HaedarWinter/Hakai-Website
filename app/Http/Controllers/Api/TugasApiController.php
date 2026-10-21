@@ -49,7 +49,54 @@ class TugasApiController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $page = $query->latest()->paginate($perPage);
+        $stats = (clone $query)->selectRaw(
+            'COUNT(*) as total,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as submitted,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected',
+            [Tugas::STATUS_APPROVED, Tugas::STATUS_PENDING, Tugas::STATUS_SUBMITTED, Tugas::STATUS_REJECTED]
+        )->first();
+
+        $search = trim(mb_substr((string) $request->input('q', ''), 0, 100));
+        if ($search !== '') {
+            $like = '%'.mb_strtolower($search).'%';
+            $query->where(function ($where) use ($like) {
+                $where->whereRaw('LOWER(tugas) LIKE ?', [$like])
+                    ->orWhereHas('user', function ($employee) use ($like) {
+                        $employee->whereRaw('LOWER(nama) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(email) LIKE ?', [$like]);
+                    });
+            });
+        }
+
+        $status = (string) $request->input('status', '');
+        if (in_array($status, [Tugas::STATUS_PENDING, Tugas::STATUS_SUBMITTED, Tugas::STATUS_APPROVED, Tugas::STATUS_REJECTED], true)) {
+            $query->where('status', $status);
+        }
+
+        $priority = (string) $request->input('priority', '');
+        if (in_array($priority, ['low', 'medium', 'high'], true)) {
+            $query->where('priority', $priority);
+        }
+
+        if ($user->isAdmin() && $request->filled('user_id')) {
+            $query->where('user_id', (int) $request->input('user_id'));
+        }
+
+        $sortColumns = [
+            'tugas' => 'tugas',
+            'status' => 'status',
+            'priority' => 'priority',
+            'tanggal_mulai' => 'tanggal_mulai',
+            'tanggal_selesai' => 'tanggal_selesai',
+            'user_id' => 'user_id',
+            'created_at' => 'created_at',
+        ];
+        $sort = $sortColumns[(string) $request->input('sort', 'created_at')] ?? 'created_at';
+        $direction = $request->input('dir') === 'asc' ? 'asc' : 'desc';
+
+        $page = $query->orderBy($sort, $direction)->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -60,6 +107,12 @@ class TugasApiController extends Controller
                 'total' => $page->total(),
                 'last_page' => $page->lastPage(),
                 'has_more' => $page->hasMorePages(),
+                'stats' => [
+                    'total' => (int) ($stats->total ?? 0),
+                    'selesai' => (int) ($stats->approved ?? 0),
+                    'proses' => (int) (($stats->submitted ?? 0) + ($stats->rejected ?? 0)),
+                    'pending' => (int) ($stats->pending ?? 0),
+                ],
             ],
         ]);
     }

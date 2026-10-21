@@ -489,21 +489,89 @@
             const comments = initComments();
             initPreviewToggle();
 
+            const formatDateTime = window.HakaiTugas.formatDateTime;
+            const sortColumns = {
+                2: 'tugas',
+                3: 'tanggal_selesai',
+                6: 'status'
+            };
+
+            function updateStats(stats) {
+                $('#total-tugas').text(stats.total);
+                $('#total-selesai').text(stats.selesai);
+                $('#total-proses').text(stats.proses);
+                $('#total-pending').text(stats.pending);
+            }
+
             const taskTable = $('#taskTable').DataTable({
+                processing: true,
+                serverSide: true,
                 scrollX: true,
                 responsive: false,
                 autoWidth: false,
                 pageLength: 10,
+                order: [],
                 language: {
                     url: '{{ asset("json/datatables-indonesian.json") }}'
+                },
+                ajax: {
+                    url: '/api/tugas',
+                    data: function (d) {
+                        const order = d.order && d.order[0];
+                        return {
+                            page: Math.floor(d.start / d.length) + 1,
+                            per_page: d.length,
+                            q: d.search.value,
+                            status: $('#filter-status').val(),
+                            priority: $('#filter-priority').val(),
+                            sort: order ? sortColumns[order.column] : undefined,
+                            dir: order && sortColumns[order.column] ? order.dir : undefined,
+                            _t: Date.now()
+                        };
+                    },
+                    dataSrc: function (json) {
+                        if (!json.success) return [];
+
+                        json.recordsTotal = json.meta.stats.total;
+                        json.recordsFiltered = json.meta.total;
+                        updateStats(json.meta.stats);
+
+                        const start = (json.meta.current_page - 1) * json.meta.per_page;
+
+                        return json.data.map(function (task, index) {
+                            const meta = statusMeta(task);
+
+                            return [
+                                start + index + 1,
+                                `<div class="custom-control custom-checkbox d-inline-block">
+                                    <input type="checkbox" class="custom-control-input task-checkbox" id="task-${task.id}" data-id="${task.id}">
+                                    <label class="custom-control-label" for="task-${task.id}"></label>
+                                </div>`,
+                                `<a href="javascript:void(0)" class="task-link btn-detail" data-id="${task.id}">
+                                    <div class="task-title" title="${task.tugas}">${task.tugas}</div>
+                                </a>`,
+                                `<div class="text-center small">
+                                    <div class="text-nowrap"><i class="fas fa-calendar-alt text-gray-400 mr-1"></i> ${formatDateTime(task.tanggal_mulai)}</div>
+                                    <div class="text-nowrap"><i class="fas fa-calendar-check text-gray-400 mr-1"></i> ${formatDateTime(task.tanggal_selesai)}</div>
+                                </div>`,
+                                `<div class="text-center">${task.tugas_file ? `<a href="/storage/${task.tugas_file}" target="_blank" class="btn btn-sm btn-outline-primary shadow-sm"><i class="fas fa-file-download"></i></a>` : '<span class="text-muted small">-</span>'}</div>`,
+                                `<div class="text-center">${task.karyawan_file ? `<a href="/storage/${task.karyawan_file}" target="_blank" class="btn btn-sm btn-outline-success shadow-sm"><i class="fas fa-check-double mr-1"></i> Terkirim</a>` : '<span class="text-muted small">Belum ada</span>'}</div>`,
+                                `<span class="status-pill-premium status-pill-${meta.className}"><i class="fas ${meta.icon}"></i> ${meta.label}</span>`,
+                                actionButtons(task, meta)
+                            ];
+                        });
+                    },
+                    error: function (xhr) {
+                        console.error('Error loading tasks:', xhr);
+                    }
                 },
                 columnDefs: [
                     { targets: 0, orderable: false, className: 'col-no d-none d-md-table-cell text-center', width: '50px' },
                     { targets: 1, orderable: false, className: 'col-checkbox text-center', width: '40px' },
                     { targets: 2, className: 'col-tugas' },
                     { targets: 3, className: 'col-periode text-center', width: '160px' },
-                    { targets: 4, className: 'col-file-admin text-center', width: '100px' },
-                    { targets: 5, className: 'col-file-employee text-center', width: '100px' },
+                    { targets: 4, className: 'col-file-admin text-center', width: '100px', orderable: false },
+                    { targets: 5, className: 'col-file-employee text-center', width: '100px', orderable: false },
                     { targets: 6, className: 'col-status text-center', width: '130px' },
                     { targets: 7, className: 'col-aksi text-center', width: '120px', orderable: false }
                 ],
@@ -520,8 +588,6 @@
             });
 
             bindGlobalSearch(taskTable);
-
-            const formatDateTime = window.HakaiTugas.formatDateTime;
 
             function statusMeta(task) {
                 if (task.status === 'approved') {
@@ -543,68 +609,17 @@
             }
 
             function loadTasks() {
-                $.ajax({
-                    url: "/api/tugas?per_page=1000",
-                    type: "GET",
-                    dataType: "json",
-                    cache: false,
-                    success: function (res) {
-                        if (!res.success) return;
-
-                        taskTable.clear();
-                        const stats = { total: 0, selesai: 0, proses: 0, pending: 0 };
-                        const rows = [];
-
-                        res.data.forEach(function (task, index) {
-                            const meta = statusMeta(task);
-                            stats.total++;
-                            stats[meta.bucket]++;
-
-                            rows.push([
-                                index + 1,
-                                `<div class="custom-control custom-checkbox d-inline-block">
-                                    <input type="checkbox" class="custom-control-input task-checkbox" id="task-${task.id}" data-id="${task.id}">
-                                    <label class="custom-control-label" for="task-${task.id}"></label>
-                                </div>`,
-                                `<a href="javascript:void(0)" class="task-link btn-detail" data-id="${task.id}">
-                                    <div class="task-title" title="${task.tugas}">${task.tugas}</div>
-                                </a>`,
-                                `<div class="text-center small">
-                                    <div class="text-nowrap"><i class="fas fa-calendar-alt text-gray-400 mr-1"></i> ${formatDateTime(task.tanggal_mulai)}</div>
-                                    <div class="text-nowrap"><i class="fas fa-calendar-check text-gray-400 mr-1"></i> ${formatDateTime(task.tanggal_selesai)}</div>
-                                </div>`,
-                                `<div class="text-center">${task.tugas_file ? `<a href="/storage/${task.tugas_file}" target="_blank" class="btn btn-sm btn-outline-primary shadow-sm"><i class="fas fa-file-download"></i></a>` : '<span class="text-muted small">-</span>'}</div>`,
-                                `<div class="text-center">${task.karyawan_file ? `<a href="/storage/${task.karyawan_file}" target="_blank" class="btn btn-sm btn-outline-success shadow-sm"><i class="fas fa-check-double mr-1"></i> Terkirim</a>` : '<span class="text-muted small">Belum ada</span>'}</div>`,
-                                `<span class="status-pill-premium status-pill-${meta.className}"><i class="fas ${meta.icon}"></i> ${meta.label}</span>`,
-                                actionButtons(task, meta)
-                            ]);
-                        });
-
-                        taskTable.rows.add(rows).draw();
-                        $('#total-tugas').text(stats.total);
-                        $('#total-selesai').text(stats.selesai);
-                        $('#total-proses').text(stats.proses);
-                        $('#total-pending').text(stats.pending);
-                    },
-                    error: function (xhr) {
-                        console.error('Error loading tasks:', xhr);
-                    }
-                });
+                taskTable.ajax.reload(null, false);
             }
 
-            $('#filter-status').on('change', function () {
-                const labels = {
-                    pending: 'Pending',
-                    submitted: 'Menunggu Persetujuan',
-                    approved: 'Disetujui',
-                    rejected: 'Ditolak'
-                };
-                taskTable.column(6).search(labels[$(this).val()] || '').draw();
+            $('#filter-status, #filter-priority').on('change', function () {
+                taskTable.ajax.reload();
             });
 
             $('#reset-filter').on('click', function () {
                 $('#filter-status, #filter-priority').val('');
-                taskTable.search('').columns().search('').draw();
+                $('.dataTables_filter input').val('');
+                taskTable.search('').ajax.reload();
             });
 
             $(document).on('click', '.btn-upload', function () {
@@ -747,7 +762,6 @@
                 });
             });
 
-            loadTasks();
         });
     </script>
     <style>

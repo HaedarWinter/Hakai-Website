@@ -27,6 +27,57 @@ class TaskTest extends TestCase
         ]);
     }
 
+    public function test_task_index_paginates_and_filters_server_side(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->create();
+
+        $alpha = $this->makeTask($admin, $employee);
+        $alpha->update(['tugas' => 'Laporan Alpha', 'priority' => 'high']);
+
+        $beta = $this->makeTask($admin, $employee, Tugas::STATUS_SUBMITTED);
+        $beta->update(['tugas' => 'Laporan Beta', 'priority' => 'low']);
+
+        $this->makeTask($admin, $employee);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/tugas?per_page=1&page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.current_page', 2);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/tugas?q=alpha')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.tugas', 'Laporan Alpha');
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/tugas?priority=high&status=pending')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $alpha->id)
+            ->assertJsonPath('meta.stats.total', 3);
+    }
+
+    public function test_employee_task_filters_cannot_escape_their_own_scope(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+
+        $ownTask = $this->makeTask($admin, $owner);
+        $this->makeTask($admin, $other);
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/tugas?user_id={$other->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ownTask->id)
+            ->assertJsonPath('meta.total', 1);
+    }
+
     public function test_employee_cannot_read_comments_of_another_employees_task(): void
     {
         $admin = User::factory()->admin()->create();

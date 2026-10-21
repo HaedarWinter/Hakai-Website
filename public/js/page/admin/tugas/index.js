@@ -8,33 +8,165 @@ $(document).ready(function () {
 
     // Initialize DataTable
     $('head').append('<style>.user-profile-link:hover { background-color: #f8f9fc !important; text-decoration: none; } .user-profile-link:hover .text-primary { text-decoration: underline; }</style>');
+    const State = {
+        hasError: false,
+        intervalId: null,
+    };
+
+    const sortColumns = {
+        3: 'tugas',
+        4: 'tanggal_selesai',
+        6: 'status'
+    };
+
     const taskTable = $('#taskTable').DataTable({
+        processing: true,
+        serverSide: true,
         scrollX: true,
         responsive: false, // Turn off responsive to force scrolling
         autoWidth: false, // Respect CSS widths
         pageLength: 10,
+        order: [],
         language: {
             url: '/assets/datatables/i18n/id.json'
+        },
+        ajax: {
+            url: '/api/tugas',
+            data: function (d) {
+                const order = d.order && d.order[0];
+                return {
+                    page: Math.floor(d.start / d.length) + 1,
+                    per_page: d.length,
+                    q: d.search.value,
+                    status: $('#filter-status').val(),
+                    user_id: $('#filter-user').val(),
+                    priority: $('#filter-priority').val(),
+                    sort: order ? sortColumns[order.column] : undefined,
+                    dir: order && sortColumns[order.column] ? order.dir : undefined,
+                    _t: Date.now()
+                };
+            },
+            dataSrc: function (json) {
+                if (!json.success) return [];
+
+                State.hasError = false;
+                json.recordsTotal = json.meta.stats.total;
+                json.recordsFiltered = json.meta.total;
+                updateStats(json.meta.stats);
+
+                const start = (json.meta.current_page - 1) * json.meta.per_page;
+
+                return json.data.map(function (task, index) {
+                    let statusBadge = '';
+                    let statusClass = '';
+                    let iconClass = '';
+
+                    if (task.status === 'approved') {
+                        statusBadge = 'Disetujui'; statusClass = 'success'; iconClass = 'fa-check-circle';
+                    } else if (task.status === 'submitted') {
+                        statusBadge = 'Menunggu'; statusClass = 'info'; iconClass = 'fa-clock';
+                    } else if (task.status === 'rejected') {
+                        statusBadge = 'Ditolak'; statusClass = 'danger'; iconClass = 'fa-times-circle';
+                    } else {
+                        statusBadge = 'Pending'; statusClass = 'warning'; iconClass = 'fa-hourglass-half';
+                    }
+
+                    const formattedStartDate = formatDateTime(task.tanggal_mulai);
+                    const formattedEndDate = formatDateTime(task.tanggal_selesai);
+
+                    const actionButtons = `
+                        <div class="dropdown no-arrow">
+                            <button class="btn btn-sm btn-light btn-circle shadow-sm dropdown-toggle" type="button"
+                                    id="taskAction-${task.id}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-ellipsis-v text-gray-600"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="taskAction-${task.id}">
+                                <div class="dropdown-header">Kelola Tugas:</div>
+                                <a class="dropdown-item btn-detail" href="#" data-id="${task.id}">
+                                    <i class="fas fa-eye fa-sm fa-fw mr-2 text-info"></i> Lihat Detail
+                                </a>
+                                <a class="dropdown-item btn-edit" href="#" data-id="${task.id}">
+                                    <i class="fas fa-edit fa-sm fa-fw mr-2 text-warning"></i> Edit Tugas
+                                </a>
+                                ${task.status === 'submitted' ? `
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item btn-approve text-success" href="#" data-id="${task.id}" data-nama="${task.user.nama}">
+                                        <i class="fas fa-check fa-sm fa-fw mr-2"></i> Setujui
+                                    </a>
+                                    <a class="dropdown-item btn-reject text-danger" href="#" data-id="${task.id}" data-nama="${task.user.nama}">
+                                        <i class="fas fa-times fa-sm fa-fw mr-2"></i> Tolak
+                                    </a>
+                                ` : ''}
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item btn-delete text-danger" href="#" data-id="${task.id}">
+                                    <i class="fas fa-trash fa-sm fa-fw mr-2"></i> Hapus
+                                </a>
+                            </div>
+                        </div>
+                    `;
+
+                    const checkboxHtml = `
+                        <div class="custom-control custom-checkbox text-center">
+                            <input type="checkbox" class="custom-control-input task-checkbox"
+                                id="customCheck${task.id}"
+                                data-id="${task.id}"
+                                data-status="${task.status}">
+                            <label class="custom-control-label" for="customCheck${task.id}"></label>
+                        </div>
+                    `;
+
+                    const photoUrl = task.user && task.user.profile_photo_path ? `/storage/${task.user.profile_photo_path}` : null;
+                    const name = task.user ? task.user.nama : 'N/A';
+                    const email = task.user ? task.user.email : '-';
+                    const avatarHtml = photoUrl
+                        ? `<img class="img-profile rounded-circle shadow-sm" src="${photoUrl}" style="width: 38px; height: 38px; object-fit: cover; border: 2px solid #fff;">`
+                        : `<div class="icon-circle shadow-sm bg-primary text-white" style="width: 38px; height: 38px;"><i class="fas fa-user"></i></div>`;
+
+                    return [
+                        start + index + 1,
+                        checkboxHtml,
+                        `<div class="d-flex align-items-center p-1 user-profile-link"
+                             style="cursor: pointer; transition: all 0.2s; border-radius: 8px;"
+                             onclick="window.location.href='/profile/${task.user ? task.user.id : ''}'"
+                             data-search="${name} ${email}">
+                            <div class="mr-3">${avatarHtml}</div>
+                            <div class="min-width-0">
+                                <div class="font-weight-bold text-primary text-truncate mb-0" style="max-width: 150px;">${name}</div>
+                                <div class="small text-muted text-truncate" style="max-width: 150px;">${email}</div>
+                            </div>
+                        </div>`,
+                        `<a href="javascript:void(0)" class="task-link btn-detail" data-id="${task.id}">
+                            <div class="task-title font-weight-bold" title="${task.tugas}" style="color: #4e73df;">${task.tugas}</div>
+                        </a>`,
+                        `<div class="text-center small">
+                            <div class="text-nowrap mb-1"><i class="fas fa-calendar-alt text-gray-400 mr-2"></i> ${formattedStartDate}</div>
+                            <div class="text-nowrap"><i class="fas fa-calendar-check text-gray-400 mr-2"></i> ${formattedEndDate}</div>
+                        </div>`,
+                        `<div class="d-flex justify-content-center" style="gap: 5px;">
+                            ${task.tugas_file ? `<a href="/storage/${task.tugas_file}" target="_blank" class="btn btn-xs btn-outline-primary shadow-sm" title="File Admin"><i class="fas fa-file-export"></i></a>` : ''}
+                            ${task.karyawan_file ? `<a href="/storage/${task.karyawan_file}" target="_blank" class="btn btn-xs btn-outline-success shadow-sm" title="File Karyawan"><i class="fas fa-file-import"></i></a>` : ''}
+                            ${(!task.tugas_file && !task.karyawan_file) ? '<span class="text-muted small">-</span>' : ''}
+                        </div>`,
+                        `<span class="status-pill-premium status-pill-${statusClass}"><i class="fas ${iconClass}"></i> ${statusBadge}</span>`,
+                        actionButtons
+                    ];
+                });
+            },
+            error: function (xhr) {
+                State.hasError = true;
+                const message = xhr.responseJSON && xhr.responseJSON.message
+                    ? xhr.responseJSON.message
+                    : 'Gagal memuat data tugas.';
+                showError(message);
+            }
         },
         columnDefs: [
             { targets: 0, orderable: false, className: 'col-no d-none d-md-table-cell text-center', width: '50px' },
             { targets: 1, visible: false, orderable: false, className: 'col-checkbox', width: '40px' },
-            {
-                targets: 2,
-                className: 'col-karyawan',
-                width: '180px',
-                // Use data-search attribute for searching instead of rendered HTML
-                render: function (data, type, row) {
-                    if (type === 'filter') {
-                        const div = $(data.trim());
-                        return div.attr('data-search') || div.text();
-                    }
-                    return data;
-                }
-            },
+            { targets: 2, className: 'col-karyawan', width: '180px', orderable: false },
             { targets: 3, className: 'col-tugas' }, // Auto width
             { targets: 4, className: 'col-periode', width: '170px' },
-            { targets: 5, className: 'col-file text-center', width: '100px' },
+            { targets: 5, className: 'col-file text-center', width: '100px', orderable: false },
             { targets: 6, className: 'col-status text-center', width: '130px' },
             { targets: 7, className: 'col-aksi text-center', width: '200px', orderable: false }
         ],
@@ -53,39 +185,14 @@ $(document).ready(function () {
     // Connect Global Search Input to DataTable
     window.HakaiTugas.bindGlobalSearch(taskTable);
 
-    //untuk nomor urut
-    taskTable.on('order.dt search.dt draw.dt', function () {
-        let i = 1
-        taskTable.cells(null, 0, { search: 'applied', order: 'applied' }).every(function () {
-            this.data(i++)
-        });
-    }).draw();
-
-    // --- PERBAIKAN: Manajemen State & Loading yang Lebih Baik ---
-    const State = {
-        isLoading: false,
-        hasError: false,
-        lastLoadTime: 0,
-        intervalId: null,
-    };
-
     // Variable to store original task data for comparison
     let originalTaskData = {};
 
-    function showLoading() {
-        // Only show loading if table is empty to avoid flickering on refresh
-        if (taskTable.data().count() === 0) {
-            $('#task-body').html(`
-                <tr>
-                    <td colspan="8" class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="sr-only">Loading...</span>
-                        </div>
-                        <p class="mt-2 text-gray-600">Memuat data tugas...</p>
-                    </td>
-                </tr>
-            `);
-        }
+    function updateStats(stats) {
+        $('#total-tugas').text(stats.total);
+        $('#total-selesai').text(stats.selesai);
+        $('#total-proses').text(stats.proses);
+        $('#total-pending').text(stats.pending);
     }
 
     function showError(message) {
@@ -103,173 +210,9 @@ $(document).ready(function () {
             `);
     }
 
-    window.loadTasks = function (forceReload = false) {
-        if (State.isLoading && !forceReload) return;
-        if (State.hasError && !forceReload) return;
-
-        State.isLoading = true;
-        State.hasError = false;
-        showLoading();
-
-        $.ajax({
-            url: "/api/tugas?per_page=1000&_t=" + Date.now(),
-            type: "GET",
-            dataType: "json",
-            cache: false,
-            success: function (res) {
-                if (res.success) {
-                    taskTable.clear();
-
-                    let stats = { total: 0, selesai: 0, proses: 0, pending: 0 };
-                    let dataRows = [];
-
-                    $.each(res.data, function (index, task) {
-                        stats.total++;
-                        let statusBadge = '';
-                        let statusClass = '';
-                        let iconClass = '';
-
-                        if (task.status === 'approved') {
-                            statusBadge = 'Disetujui'; statusClass = 'success'; iconClass = 'fa-check-circle'; stats.selesai++;
-                        } else if (task.status === 'submitted') {
-                            statusBadge = 'Menunggu'; statusClass = 'info'; iconClass = 'fa-clock'; stats.proses++;
-                        } else if (task.status === 'rejected') {
-                            statusBadge = 'Ditolak'; statusClass = 'danger'; iconClass = 'fa-times-circle'; stats.proses++;
-                        } else {
-                            statusBadge = 'Pending'; statusClass = 'warning'; iconClass = 'fa-hourglass-half'; stats.pending++;
-                        }
-
-                        const formattedStartDate = formatDateTime(task.tanggal_mulai);
-                        const formattedEndDate = formatDateTime(task.tanggal_selesai);
-
-                        // Premium Action Dropdown
-                        let actionButtons = `
-                            <div class="dropdown no-arrow">
-                                <button class="btn btn-sm btn-light btn-circle shadow-sm dropdown-toggle" type="button" 
-                                        id="taskAction-${task.id}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    <i class="fas fa-ellipsis-v text-gray-600"></i>
-                                </button>
-                                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="taskAction-${task.id}">
-                                    <div class="dropdown-header">Kelola Tugas:</div>
-                                    <a class="dropdown-item btn-detail" href="#" data-id="${task.id}">
-                                        <i class="fas fa-eye fa-sm fa-fw mr-2 text-info"></i> Lihat Detail
-                                    </a>
-                                    <a class="dropdown-item btn-edit" href="#" data-id="${task.id}">
-                                        <i class="fas fa-edit fa-sm fa-fw mr-2 text-warning"></i> Edit Tugas
-                                    </a>
-                                    ${task.status === 'submitted' ? `
-                                        <div class="dropdown-divider"></div>
-                                        <a class="dropdown-item btn-approve text-success" href="#" data-id="${task.id}" data-nama="${task.user.nama}">
-                                            <i class="fas fa-check fa-sm fa-fw mr-2"></i> Setujui
-                                        </a>
-                                        <a class="dropdown-item btn-reject text-danger" href="#" data-id="${task.id}" data-nama="${task.user.nama}">
-                                            <i class="fas fa-times fa-sm fa-fw mr-2"></i> Tolak
-                                        </a>
-                                    ` : ''}
-                                    <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item btn-delete text-danger" href="#" data-id="${task.id}">
-                                        <i class="fas fa-trash fa-sm fa-fw mr-2"></i> Hapus
-                                    </a>
-                                </div>
-                            </div>
-                        `;
-
-                        // Checkbox column
-                        const checkboxHtml = `
-                                                <div class="custom-control custom-checkbox text-center">
-                                                    <input type="checkbox" class="custom-control-input task-checkbox"
-                                                        id="customCheck${task.id}"
-                                                        data-id="${task.id}"
-                                                        data-status="${task.status}">
-                                                    <label class="custom-control-label" for="customCheck${task.id}"></label>
-                                                </div>
-                                            `;
-
-                        dataRows.push([
-                            index + 1,    // Column 0: No
-                            checkboxHtml, // Column 1: Checkbox
-
-                            // Column 2: Employee
-                            (() => {
-                                const photoUrl = task.user && task.user.profile_photo_path ? `/storage/${task.user.profile_photo_path}` : null;
-                                const name = task.user ? task.user.nama : 'N/A';
-                                const email = task.user ? task.user.email : '-';
-                                const avatarHtml = photoUrl
-                                    ? `<img class="img-profile rounded-circle shadow-sm" src="${photoUrl}" style="width: 38px; height: 38px; object-fit: cover; border: 2px solid #fff;">`
-                                    : `<div class="icon-circle shadow-sm bg-primary text-white" style="width: 38px; height: 38px;"><i class="fas fa-user"></i></div>`;
-
-                                return `<div class="d-flex align-items-center p-1 user-profile-link" 
-                                             style="cursor: pointer; transition: all 0.2s; border-radius: 8px;" 
-                                             onclick="window.location.href='/profile/${task.user ? task.user.id : ''}'" 
-                                             data-search="${name} ${email}">
-                                            <div class="mr-3">${avatarHtml}</div>
-                                            <div class="min-width-0">
-                                                <div class="font-weight-bold text-primary text-truncate mb-0" style="max-width: 150px;">${name}</div>
-                                                <div class="small text-muted text-truncate" style="max-width: 150px;">${email}</div>
-                                            </div>
-                                        </div>`;
-                            })(),
-
-                            `<a href="javascript:void(0)" class="task-link btn-detail" data-id="${task.id}">
-                                <div class="task-title font-weight-bold" title="${task.tugas}" style="color: #4e73df;">${task.tugas}</div>
-                            </a>`,
-
-                            `<div class="text-center small">
-                                <div class="text-nowrap mb-1"><i class="fas fa-calendar-alt text-gray-400 mr-2"></i> ${formattedStartDate}</div>
-                                <div class="text-nowrap"><i class="fas fa-calendar-check text-gray-400 mr-2"></i> ${formattedEndDate}</div>
-                            </div>`,
-
-                            // Column 5: File Indicator
-                            `<div class="d-flex justify-content-center" style="gap: 5px;">
-                                ${task.tugas_file ? `<a href="/storage/${task.tugas_file}" target="_blank" class="btn btn-xs btn-outline-primary shadow-sm" title="File Admin"><i class="fas fa-file-export"></i></a>` : ''}
-                                ${task.karyawan_file ? `<a href="/storage/${task.karyawan_file}" target="_blank" class="btn btn-xs btn-outline-success shadow-sm" title="File Karyawan"><i class="fas fa-file-import"></i></a>` : ''}
-                                ${(!task.tugas_file && !task.karyawan_file) ? '<span class="text-muted small">-</span>' : ''}
-                            </div>`,
-
-                            `<span class="status-pill-premium status-pill-${statusClass}"><i class="fas ${iconClass}"></i> ${statusBadge}</span>`,
-                            actionButtons
-                        ]);
-
-                        // Determine priority for row node attribute later
-                        task._priority = task.priority || 'medium';
-                    });
-
-                    taskTable.rows.add(dataRows).draw();
-
-                    // Add priority attributes to row nodes for filtering
-                    taskTable.rows().every(function (rowIdx) {
-                        const data = this.data();
-                        const taskObj = res.data[rowIdx];
-                        if (taskObj) {
-                            $(this.node()).attr('data-priority', taskObj.priority || 'medium');
-                        }
-                    });
-
-                    $('#total-tugas').text(stats.total);
-                    $('#total-selesai').text(stats.selesai);
-                    $('#total-proses').text(stats.proses);
-                    $('#total-pending').text(stats.pending);
-                    State.lastLoadTime = Date.now();
-                } else {
-                    showError('Server merespon sukses, tetapi tidak ada data.');
-                }
-            },
-            error: function (xhr) {
-                let errorMsg = 'Gagal memuat data tugas.';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg = xhr.responseJSON.message;
-                }
-                showError(errorMsg);
-            },
-            complete: function () {
-                State.isLoading = false;
-                // Restore selection mode state if active
-                if ($('#toggle-selection-mode').hasClass('active')) {
-                    $('.selection-col').show();
-                }
-            }
-        });
-    }
+    window.loadTasks = function () {
+        taskTable.ajax.reload(null, false);
+    };
 
     // Auto Refresh
     function startAutoRefresh() {
@@ -287,49 +230,14 @@ $(document).ready(function () {
         }
     }
     // Filter Logic
-    function applyFilters() {
-        let table = $('#taskTable').DataTable();
-        table.search('').columns().search('');
-
-        let statusFilter = $('#filter-status').val();
-        if (statusFilter) table.column(6).search(statusFilter);
-
-        let userFilter = $('#filter-user').val();
-        if (userFilter) table.column(2).search(userFilter);
-
-        table.draw();
-    }
-
-    $('#filter-status, #filter-user').on('change', applyFilters);
-
-    $('#filter-priority').on('change', function () {
-        let priorityFilter = $(this).val();
-        let table = $('#taskTable').DataTable();
-
-        if (priorityFilter) {
-            $.fn.dataTable.ext.search.push(
-                function (settings, data, dataIndex) {
-                    let row = table.row(dataIndex).node();
-                    let priority = $(row).attr('data-priority');
-                    return priority === priorityFilter;
-                }
-            );
-        } else {
-            // Remove the specific priority filter function
-            // Note: This is a bit simplistic if we have multiple custom filters.
-            // Ideally we should name the filter or manage the array better.
-            // But for now, we'll just clear custom filters when resetting or changing.
-            // A better approach is to always have the filter function present but check the value.
-            $.fn.dataTable.ext.search.pop();
-        }
-        table.draw();
+    $('#filter-status, #filter-user, #filter-priority').on('change', function () {
+        taskTable.ajax.reload();
     });
 
     $('#reset-filter').on('click', function () {
         $('#filter-status, #filter-user, #filter-priority').val('');
-        $.fn.dataTable.ext.search = [];
-        let table = $('#taskTable').DataTable();
-        table.search('').columns().search('').draw();
+        $('.dataTables_filter input').val('');
+        taskTable.search('').ajax.reload();
     });
 
     // CREATE TASK
@@ -745,9 +653,6 @@ $(document).ready(function () {
             taskTable.columns.adjust().draw(false);
         }, 250);
     });
-
-    // Initial Load
-    loadTasks();
 
     startAutoRefresh();
 });
