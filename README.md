@@ -6,8 +6,6 @@ catatan. Proyek ini mencakup dashboard statistik, komentar bertingkat, notifikas
 trash, audit log, ekspor PDF/Excel, dan PWA.
 
 - Repo: <https://github.com/HaedarWinter/Hakai-Website>
-- Laporan proyek: `LAPORAN_PKL.md`
-- Panduan agen otomatis: `AGENTS.md`
 
 ## Daftar Isi
 
@@ -57,7 +55,7 @@ trash, audit log, ekspor PDF/Excel, dan PWA.
 - Tugas hanya bisa diberikan ke user berjabatan `Karyawan`.
 - Unggah file instruksi, prioritas `low` / `medium` / `high`.
 - Setujui atau tolak tugas yang berstatus `submitted`, dengan catatan penolakan.
-- Filter status, karyawan, dan prioritas.
+- Paginasi, pencarian, urutan, dan filter status/karyawan/prioritas di server.
 - Mode seleksi dan hapus massal.
 - Ekspor Excel dan PDF sesuai cakupan data.
 - Badge jumlah tugas menunggu persetujuan.
@@ -71,6 +69,7 @@ trash, audit log, ekspor PDF/Excel, dan PWA.
 - Menghapus tugas miliknya ke trash dan melihat isi trash miliknya.
 - Ekspor Excel dan PDF miliknya.
 - Statistik ringkas di halaman tugas.
+- Paginasi, pencarian, urutan, dan filter status/prioritas di server.
 
 ### Komentar
 
@@ -284,7 +283,6 @@ Dibuat oleh `php artisan db:seed`:
 | Email | Password | Peran |
 |---|---|---|
 | `superadmin@hakai.com` | `superadmin123` | Super Admin |
-| `andita@hakai.com` | `anditacantik123` | Super Admin |
 | `admin@hakai.com` | `admin123` | Admin |
 | `budi.santoso@hakai.com` | `karyawan123` | Karyawan |
 | `siti.nurhaliza@hakai.com` | `karyawan123` | Karyawan |
@@ -338,7 +336,7 @@ Daftar endpoint:
 | POST | `/api/settings/profile` | auth | Ubah nama/email |
 | POST | `/api/settings/photo` | auth | Unggah foto profil (multipart) |
 | PUT | `/api/settings/password` | auth | Ganti password |
-| GET | `/api/tugas` | auth | Daftar tugas, `per_page` 1-1000 |
+| GET | `/api/tugas` | auth | Daftar tugas; `page`, `per_page` 1-1000, `q`, `status`, `priority`, `user_id` (admin), `sort`, `dir` |
 | POST | `/api/tugas` | admin | Buat tugas (multipart opsional) |
 | GET | `/api/tugas/karyawan` | auth | Pilihan karyawan untuk assignment |
 | GET | `/api/tugas/trash/list` | auth | Daftar tugas di trash |
@@ -474,13 +472,8 @@ Opsi gratis untuk demo portofolio:
 
 ## Batasan yang Diketahui
 
-- UI daftar tugas meminta `per_page=1000`. Batas server 1000 baris; paginasi
-  server-side belum dipakai di UI.
-- Filter prioritas berjalan di sisi klien.
 - Reset password WhatsApp hanya membuat tautan dan membuka `wa.me`; tidak ada
   integrasi API WhatsApp.
 - Notifikasi dalam aplikasi memakai polling 60 detik, bukan WebSocket.
 - Penyimpanan file memakai disk lokal; belum ada object storage.
-- Kolom `is_tugas` dan tabel `settings` adalah sisa skema lama dan tidak dipakai
-  oleh fitur aktif.
 - Belum ada verifikasi email.
