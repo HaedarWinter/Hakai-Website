@@ -7,7 +7,7 @@ audit log, serta ekspor PDF/Excel.
 
 ## Stack
 
-- PHP 8.2+, Laravel 12, MySQL (SQLite untuk test)
+- PHP 8.2+, Laravel 12, PostgreSQL (SQLite untuk test)
 - Blade + SB Admin 2, jQuery, DataTables, SweetAlert2, Chart.js
 - Laravel Sanctum (sesi web + bearer token)
 - DomPDF dan Maatwebsite Excel untuk laporan
