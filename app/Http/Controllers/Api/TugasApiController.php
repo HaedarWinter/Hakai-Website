@@ -2,22 +2,23 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\TugasExport;
 use App\Http\Controllers\Controller;
 use App\Models\Tugas;
 use App\Models\User;
 use App\Services\StatisticsService;
 use App\Services\TugasService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\TugasExport;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class TugasApiController extends Controller
 {
     use AuthorizesRequests;
 
     protected $statsService;
+
     protected $tugasService;
 
     public function __construct(StatisticsService $statsService, TugasService $tugasService)
@@ -29,7 +30,7 @@ class TugasApiController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
@@ -37,22 +38,29 @@ class TugasApiController extends Controller
         // Refresh user from database to ensure we have the latest data
         $user->refresh();
 
+        $perPage = min(max((int) $request->integer('per_page', 200), 1), 1000);
+
         // Only get non-deleted records
         $query = Tugas::with(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path'])->whereNull('deleted_at');
 
         if ($user->isAdmin()) {
-            $tugas = $query->where('created_by', $user->id)
-                ->latest()
-                ->get();
+            $query->where('created_by', $user->id);
         } else {
-            $tugas = $query->where('user_id', $user->id)
-                ->latest()
-                ->get();
+            $query->where('user_id', $user->id);
         }
+
+        $page = $query->latest()->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $tugas,
+            'data' => $page->items(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+                'last_page' => $page->lastPage(),
+                'has_more' => $page->hasMorePages(),
+            ],
         ]);
     }
 
@@ -67,12 +75,12 @@ class TugasApiController extends Controller
             'tanggal_mulai' => 'required|date_format:Y-m-d\TH:i',
             'tanggal_selesai' => 'required|date_format:Y-m-d\TH:i|after_or_equal:tanggal_mulai',
             'priority' => 'nullable|in:low,medium,high',
-            'file' => 'nullable|file|max:51200', // 50MB - all formats supported
+            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,jpg,jpeg,png|max:51200',
         ]);
 
         $user = User::findOrFail($validated['user_id']);
 
-        if (!$user->isEmployee()) {
+        if (! $user->isEmployee()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Hanya bisa menugaskan ke karyawan',
@@ -154,7 +162,12 @@ class TugasApiController extends Controller
     {
         $this->authorize('approve', $tugas);
 
-        $this->tugasService->approveTugas($tugas);
+        if (! $this->tugasService->approveTugas($tugas)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tugas tidak dalam status menunggu persetujuan.',
+            ], 409);
+        }
 
         return response()->json([
             'success' => true,
@@ -175,6 +188,13 @@ class TugasApiController extends Controller
 
         $tugas = $this->tugasService->rejectTugas($tugas, $validated['catatan']);
 
+        if ($tugas === false) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tugas tidak dalam status menunggu persetujuan.',
+            ], 409);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Tugas ditolak',
@@ -189,11 +209,18 @@ class TugasApiController extends Controller
     {
         $this->authorize('upload', $tugas);
 
-        $validated = $request->validate([
-            'file' => 'required|file|max:51200', // 50MB - all formats supported
+        $request->validate([
+            'file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,jpg,jpeg,png|max:51200',
         ]);
 
         $tugas = $this->tugasService->uploadResult($tugas, $request->file('file'));
+
+        if ($tugas === false) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tugas tidak dapat menerima file pada status saat ini.',
+            ], 409);
+        }
 
         return response()->json([
             'success' => true,
@@ -207,7 +234,7 @@ class TugasApiController extends Controller
      */
     public function karyawanList()
     {
-        $karyawan = User::employees()->get(['id', 'nama', 'email']);
+        $karyawan = User::employees()->orderBy('nama')->limit(1000)->get(['id', 'nama', 'email']);
 
         return response()->json([
             'success' => true,
@@ -218,28 +245,35 @@ class TugasApiController extends Controller
     /**
      * Get list of trashed tasks.
      */
-    public function trash()
+    public function trash(Request $request)
     {
         /** @var \App\Models\User $user */
         $user = auth()->user();
         $user->refresh();
 
+        $perPage = min(max((int) $request->integer('per_page', 200), 1), 1000);
+
         $query = Tugas::onlyTrashed()
             ->with(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path']);
 
         if ($user->isAdmin()) {
-            $tugas = $query->where('created_by', $user->id)
-                ->latest('deleted_at')
-                ->get();
+            $query->where('created_by', $user->id);
         } else {
-            $tugas = $query->where('user_id', $user->id)
-                ->latest('deleted_at')
-                ->get();
+            $query->where('user_id', $user->id);
         }
+
+        $page = $query->latest('deleted_at')->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $tugas,
+            'data' => $page->items(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+                'last_page' => $page->lastPage(),
+                'has_more' => $page->hasMorePages(),
+            ],
         ]);
     }
 
@@ -287,7 +321,7 @@ class TugasApiController extends Controller
         $user = auth()->user();
 
         // Only the Admin who created the task can permanently delete
-        if (!$user->isAdmin() || $tugas->created_by !== $user->id) {
+        if (! $user->isAdmin() || $tugas->created_by !== $user->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Anda tidak memiliki izin untuk menghapus permanen tugas ini',
@@ -309,6 +343,7 @@ class TugasApiController extends Controller
     {
         $user = auth()->user();
         $filename = now()->format('Ymd_His');
+
         return Excel::download(new TugasExport($user), "DataTugas_{$filename}.xlsx");
     }
 
@@ -337,7 +372,7 @@ class TugasApiController extends Controller
                     'jam' => now()->format('H:i:s'),
                 ];
 
-                $filename = 'Laporan_Tugas_Admin_' . now()->format('Ymd_His') . '.pdf';
+                $filename = 'Laporan_Tugas_Admin_'.now()->format('Ymd_His').'.pdf';
 
                 $pdf = Pdf::loadView('admin.tugas.pdf', ['data' => $data])
                     ->setPaper('A4', 'landscape')
@@ -363,7 +398,7 @@ class TugasApiController extends Controller
                     'jam' => now()->format('H:i:s'),
                 ];
 
-                $filename = 'Laporan_Tugas_Saya_' . now()->format('Ymd_His') . '.pdf';
+                $filename = 'Laporan_Tugas_Saya_'.now()->format('Ymd_His').'.pdf';
 
                 $pdf = Pdf::loadView('karyawan.tugas.pdf', ['data' => $data])
                     ->setPaper('A4', 'portrait')
@@ -379,9 +414,8 @@ class TugasApiController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat PDF: ' . $e->getMessage()
+                'message' => 'Gagal membuat PDF: '.$e->getMessage(),
             ], 500);
         }
     }
-
 }

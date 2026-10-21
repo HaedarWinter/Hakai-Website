@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -20,8 +21,8 @@ class SettingsApiController extends Controller
 
             $request->validate([
                 'nama' => 'required|string|max:255',
-                'email' => ['required', 'email', Rule::unique('users')->whereNull('deleted_at')->ignore($user->id)],
-                'photo' => 'nullable|image|max:51200', // 50MB Max
+                'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+                'photo' => 'nullable|mimes:jpg,jpeg,png,webp|max:2048',
             ]);
 
             $user->nama = $request->nama;
@@ -43,8 +44,8 @@ class SettingsApiController extends Controller
                 'success' => true,
                 'message' => 'Profil berhasil diperbarui.',
                 'data' => [
-                    'user' => $user->append('profile_photo_url')
-                ]
+                    'user' => $user->append('profile_photo_url'),
+                ],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
@@ -52,7 +53,7 @@ class SettingsApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat memperbarui profil.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -63,7 +64,7 @@ class SettingsApiController extends Controller
     public function updatePhoto(Request $request)
     {
         $request->validate([
-            'photo' => 'required|image|max:51200', // 50MB Max
+            'photo' => 'required|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
         $user = auth()->user();
@@ -82,14 +83,14 @@ class SettingsApiController extends Controller
                 'success' => true,
                 'message' => 'Foto profil berhasil diperbarui.',
                 'data' => [
-                    'url' => $user->profile_photo_url
-                ]
+                    'url' => $user->profile_photo_url,
+                ],
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Gagal mengupload foto.'
+            'message' => 'Gagal mengupload foto.',
         ], 400);
     }
 
@@ -105,22 +106,26 @@ class SettingsApiController extends Controller
 
         $user = auth()->user();
 
-        if (!Hash::check($request->current_password, $user->password)) {
+        if (! Hash::check($request->current_password, $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Password saat ini salah.',
                 'errors' => [
-                    'current_password' => ['Password saat ini salah.']
-                ]
+                    'current_password' => ['Password saat ini salah.'],
+                ],
             ], 422);
         }
 
         $user->password = Hash::make($request->password);
         $user->save();
 
+        // Kill tokens and sessions from other devices after a password change.
+        $user->tokens()->delete();
+        Auth::logoutOtherDevices($request->password);
+
         return response()->json([
             'success' => true,
-            'message' => 'Password berhasil diubah.'
+            'message' => 'Password berhasil diubah.',
         ]);
     }
 }

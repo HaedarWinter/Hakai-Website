@@ -1,14 +1,14 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthApiController;
-use App\Http\Controllers\Api\UserApiController;
-use App\Http\Controllers\Api\TugasApiController;
-use App\Http\Controllers\Api\SettingsApiController;
-use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Api\TrashApiController;
 use App\Http\Controllers\Api\AuditLogApiController;
+use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SettingsApiController;
+use App\Http\Controllers\Api\TrashApiController;
+use App\Http\Controllers\Api\TugasApiController;
+use App\Http\Controllers\Api\UserApiController;
+use App\Http\Controllers\DashboardController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,7 +21,7 @@ use App\Http\Controllers\Api\AuditLogApiController;
 */
 
 // Public API routes
-Route::post('/login', [AuthApiController::class, 'login']);
+Route::post('/login', [AuthApiController::class, 'login'])->middleware('login.throttle');
 
 Route::middleware(['auth:sanctum,web'])->group(function () {
     Route::get('/global-search', [App\Http\Controllers\Api\GlobalSearchController::class, 'search']);

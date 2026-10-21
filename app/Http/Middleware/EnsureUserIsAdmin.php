@@ -16,12 +16,19 @@ class EnsureUserIsAdmin
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check()) {
+        // Bearer-token clients authenticate through Sanctum, not the web guard.
+        $user = $request->user('sanctum') ?? $request->user() ?? Auth::user();
+
+        if (! $user) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
             return redirect()->route('login')->with('error', 'Anda harus login terlebih dahulu');
         }
-
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
 
         if ($user->isAdmin()) {
             return $next($request);
@@ -30,7 +37,7 @@ class EnsureUserIsAdmin
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akses ditolak. Anda tidak memiliki izin untuk melakukan aksi ini.'
+                'message' => 'Akses ditolak. Anda tidak memiliki izin untuk melakukan aksi ini.',
             ], 403);
         }
 

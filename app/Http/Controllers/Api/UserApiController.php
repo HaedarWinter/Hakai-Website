@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\StatisticsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -15,19 +17,28 @@ class UserApiController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
+        $perPage = min(max((int) $request->integer('per_page', 200), 1), 1000);
+
         $users = User::withCount([
-            'tugas' => fn($query) => $query->withTrashed()
+            'tugas' => fn ($query) => $query->withTrashed(),
         ])
             ->orderByDesc('is_super_admin')  // Super Admin first
             ->orderByRaw("CASE WHEN jabatan = 'Admin' THEN 1 ELSE 2 END")  // Then Admin before Karyawan
             ->orderBy('nama', 'asc')  // Then alphabetically
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $users
+            'data' => $users->items(),
+            'meta' => [
+                'current_page' => $users->currentPage(),
+                'per_page' => $users->perPage(),
+                'total' => $users->total(),
+                'last_page' => $users->lastPage(),
+                'has_more' => $users->hasMorePages(),
+            ],
         ]);
     }
 
@@ -43,7 +54,7 @@ class UserApiController extends Controller
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users')->whereNull('deleted_at') // Abaikan record yang sudah dihapus
+                Rule::unique('users'), // Abaikan record yang sudah dihapus
             ],
             'jabatan' => 'required|in:Admin,Karyawan',
             'password' => 'required|string|min:8|confirmed',
@@ -53,7 +64,7 @@ class UserApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation errors',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -68,7 +79,7 @@ class UserApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User created successfully',
-            'data' => $user
+            'data' => $user,
         ], 201);
     }
 
@@ -79,7 +90,7 @@ class UserApiController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $user
+            'data' => $user,
         ]);
     }
 
@@ -95,7 +106,7 @@ class UserApiController extends Controller
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users')->whereNull('deleted_at')->ignore($user->id)
+                Rule::unique('users')->ignore($user->id),
             ],
             'jabatan' => 'required|in:Admin,Karyawan',
             'password' => 'nullable|string|min:8|confirmed',
@@ -105,7 +116,7 @@ class UserApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation errors',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -121,17 +132,17 @@ class UserApiController extends Controller
             $user->jabatan !== $request->jabatan ||
             $request->filled('password');
 
-        if (!$willChange) {
+        if (! $willChange) {
             return response()->json([
                 'success' => true,
                 'message' => 'Tidak ada perubahan data',
-                'data' => $user
+                'data' => $user,
             ]);
         }
 
         // Super Admin Check: Only Super Admin can demote another Admin
         if ($user->isAdmin() && $request->jabatan !== 'Admin') {
-            if (!auth()->user()->isSuperAdmin()) {
+            if (! auth()->user()->isSuperAdmin()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Hanya Super Admin yang berhak menurunkan jabatan Admin lain.',
@@ -140,8 +151,8 @@ class UserApiController extends Controller
         }
 
         // Super Admin Check: Only Super Admin can promote to Admin
-        if (!$user->isAdmin() && $request->jabatan === 'Admin') {
-            if (!auth()->user()->isSuperAdmin()) {
+        if (! $user->isAdmin() && $request->jabatan === 'Admin') {
+            if (! auth()->user()->isSuperAdmin()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Hanya Super Admin yang berhak menaikkan jabatan menjadi Admin.',
@@ -169,13 +180,20 @@ class UserApiController extends Controller
 
         $user->update($updateData);
 
+        // A password changed by an admin must invalidate the old credentials.
+        if ($request->filled('password')) {
+            $user->tokens()->delete();
+            if (config('session.driver') === 'database') {
+                DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
-            'data' => $user
+            'data' => $user,
         ]);
     }
-
 
     /**
      * Remove the specified resource from storage.
@@ -186,25 +204,29 @@ class UserApiController extends Controller
         if (auth()->id() === $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak dapat menghapus akun sendiri'
+                'message' => 'Anda tidak dapat menghapus akun sendiri',
             ], 403);
         }
 
         // Super Admin Check: Only Super Admin can delete another Admin
         if ($user->isAdmin()) {
-            if (!auth()->user()->isSuperAdmin()) {
+            if (! auth()->user()->isSuperAdmin()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Hanya Super Admin yang berhak menghapus akun Admin lain.'
+                    'message' => 'Hanya Super Admin yang berhak menghapus akun Admin lain.',
                 ], 403);
             }
         }
+
+        // Free the email address so it can be reused, while keeping the row for audit.
+        $user->email = $user->email.'.deleted.'.$user->id;
+        $user->save();
 
         $user->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'User deleted successfully'
+            'message' => 'User deleted successfully',
         ]);
     }
 
@@ -215,18 +237,18 @@ class UserApiController extends Controller
     public function toggleSuperAdmin(Request $request, User $user)
     {
         // Only Super Admin can access this
-        if (!auth()->user()->isSuperAdmin()) {
+        if (! auth()->user()->isSuperAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akses ditolak. Hanya Super Admin yang dapat melakukan ini.'
+                'message' => 'Akses ditolak. Hanya Super Admin yang dapat melakukan ini.',
             ], 403);
         }
 
         // Target must be an Admin
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Hanya user dengan jabatan Admin yang dapat dijadikan Super Admin.'
+                'message' => 'Hanya user dengan jabatan Admin yang dapat dijadikan Super Admin.',
             ], 400);
         }
 
@@ -234,12 +256,12 @@ class UserApiController extends Controller
         if (auth()->id() === $user->id && $user->is_super_admin) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak dapat mencabut status Super Admin dari diri sendiri.'
+                'message' => 'Anda tidak dapat mencabut status Super Admin dari diri sendiri.',
             ], 403);
         }
 
         // Toggle the status
-        $user->is_super_admin = !$user->is_super_admin;
+        $user->is_super_admin = ! $user->is_super_admin;
         $user->save();
 
         $statusText = $user->is_super_admin ? 'diberikan' : 'dicabut';
@@ -247,7 +269,7 @@ class UserApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Hak Super Admin berhasil {$statusText} untuk {$user->nama}.",
-            'data' => $user
+            'data' => $user,
         ]);
     }
 
@@ -256,7 +278,8 @@ class UserApiController extends Controller
      */
     public function excel()
     {
-        $filename = 'Laporan_Data_User_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'Laporan_Data_User_'.now()->format('Ymd_His').'.xlsx';
+
         return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\UserExport, $filename);
     }
 
@@ -272,7 +295,7 @@ class UserApiController extends Controller
             },
             'tugas as tugas_pending' => function ($query) {
                 $query->where('status', 'pending');
-            }
+            },
         ])
             ->whereNull('deleted_at')
             ->orderByDesc('jabatan')
@@ -291,7 +314,7 @@ class UserApiController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.user.pdf', $data)
             ->setPaper('A4', 'landscape');
 
-        return $pdf->download('Laporan_Data_User_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->download('Laporan_Data_User_'.now()->format('Ymd_His').'.pdf');
     }
 
     /**
@@ -300,10 +323,10 @@ class UserApiController extends Controller
     public function generateResetToken(User $user)
     {
         // Only Admin can do this (Middleware will handle basic auth check)
-        if (!auth()->user()->isAdmin()) {
+        if (! auth()->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized action.'
+                'message' => 'Unauthorized action.',
             ], 403);
         }
 
@@ -324,8 +347,8 @@ class UserApiController extends Controller
             'data' => [
                 'user' => $user->nama,
                 'no_hp' => $user->no_hp,
-                'reset_link' => $resetLink
-            ]
+                'reset_link' => $resetLink,
+            ],
         ]);
     }
 }

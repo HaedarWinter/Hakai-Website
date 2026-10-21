@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Tugas;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use App\Models\User;
-use App\Models\Tugas;
 
 class ProfileController extends Controller
 {
@@ -18,14 +18,14 @@ class ProfileController extends Controller
 
     public function show(User $user)
     {
-        // Access Control: 
+        // Access Control:
         // 1. Admin can view everyone.
         // 2. User can view themselves.
         // 3. User can view other Karyawan (but NOT Admins).
         $currentUser = auth()->user();
-        $canView = $currentUser->isAdmin() || $currentUser->id === $user->id || (!$user->isAdmin());
+        $canView = $currentUser->isAdmin() || $currentUser->id === $user->id || (! $user->isAdmin());
 
-        if (!$canView) {
+        if (! $canView) {
             return redirect()->route('dashboard')->with('error', 'Anda tidak memiliki izin untuk melihat profil ini.');
         }
 
@@ -50,7 +50,7 @@ class ProfileController extends Controller
         $otherUsersQuery = User::where('id', '!=', $user->id);
 
         // If current user is NOT Admin, hide Admins from the list
-        if (!$currentUser->isAdmin()) {
+        if (! $currentUser->isAdmin()) {
             $otherUsersQuery->where('jabatan', '!=', 'Admin');
         }
 
@@ -72,20 +72,20 @@ class ProfileController extends Controller
             'alamat' => ['nullable', 'string', 'max:500'],
             'bio' => ['nullable', 'string', 'max:1000'],
             'tanggal_bergabung' => ['nullable', 'date'],
-            'photo' => ['nullable', 'image', 'max:51200'], // 50MB Max
+            'photo' => ['nullable', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
         // Handle Photo Upload
         if ($request->hasFile('photo')) {
             if ($user->profile_photo_path) {
-                Storage::delete('public/' . $user->profile_photo_path);
+                Storage::delete('public/'.$user->profile_photo_path);
             }
             $path = $request->file('photo')->store('profile-photos', 'public');
             $validated['profile_photo_path'] = $path;
         }
 
         // Remove photo from validated array to avoid updating it twice if not present
-        if (!$request->hasFile('photo')) {
+        if (! $request->hasFile('photo')) {
             unset($validated['photo']);
         }
 
@@ -104,6 +104,9 @@ class ProfileController extends Controller
         auth()->user()->update([
             'password' => Hash::make($request->password),
         ]);
+
+        auth()->user()->tokens()->delete();
+        \Illuminate\Support\Facades\Auth::logoutOtherDevices($request->password);
 
         return back()->with('success', 'Password berhasil diubah!');
     }

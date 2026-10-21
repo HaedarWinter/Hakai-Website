@@ -5,15 +5,20 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\TaskComment;
 use App\Models\Tugas;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 
 class TaskCommentController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * List all comments for a task (with nested replies).
      */
     public function index(Tugas $tugas)
     {
+        $this->authorize('view', $tugas);
+
         // Get only top-level comments (no parent)
         $comments = TaskComment::with(['user:id,nama,profile_photo_path', 'replies.user:id,nama,profile_photo_path'])
             ->where('tugas_id', $tugas->id)
@@ -35,15 +40,17 @@ class TaskCommentController extends Controller
     private function formatComments($comments, $depth = 0)
     {
         return $comments->map(function ($comment) use ($depth) {
+            $author = $comment->user;
+
             $formatted = [
                 'id' => $comment->id,
                 'content' => $comment->content,
                 'parent_id' => $comment->parent_id,
                 'depth' => $depth,
                 'user' => [
-                    'id' => $comment->user->id,
-                    'nama' => $comment->user->nama,
-                    'photo' => $comment->user->profile_photo_url,
+                    'id' => $author?->id,
+                    'nama' => $author?->nama ?? 'Pengguna dihapus',
+                    'photo' => $author?->profile_photo_url,
                 ],
                 'is_own' => $comment->user_id === auth()->id(),
                 'created_at' => $comment->created_at->format('d M Y, H:i'),
@@ -74,30 +81,15 @@ class TaskCommentController extends Controller
         ]);
 
         // Check if user has access to this task
+        $this->authorize('view', $tugas);
+
         /** @var \App\Models\User $user */
         $user = auth()->user();
 
-        // Admin can comment on tasks they created, employees can comment on their assigned tasks
-        if ($user->isAdmin()) {
-            if ($tugas->created_by !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Anda tidak memiliki akses ke tugas ini',
-                ], 403);
-            }
-        } else {
-            if ($tugas->user_id !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Anda tidak memiliki akses ke tugas ini',
-                ], 403);
-            }
-        }
-
         // If replying, verify parent comment belongs to same task
-        if (!empty($validated['parent_id'])) {
+        if (! empty($validated['parent_id'])) {
             $parentComment = TaskComment::find($validated['parent_id']);
-            if (!$parentComment || $parentComment->tugas_id !== $tugas->id) {
+            if (! $parentComment || $parentComment->tugas_id !== $tugas->id) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Komentar induk tidak valid',

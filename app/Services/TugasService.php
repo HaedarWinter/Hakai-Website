@@ -2,15 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\Tugas;
 use App\Models\User;
-use App\Models\ActivityLog;
 use App\Notifications\NewTaskAssigned;
-use App\Notifications\TaskSubmitted;
 use App\Notifications\TaskApproved;
 use App\Notifications\TaskRejected;
-use Illuminate\Support\Facades\Storage;
+use App\Notifications\TaskSubmitted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class TugasService
 {
@@ -21,8 +21,8 @@ class TugasService
     {
         return DB::transaction(function () use ($data) {
             // Convert datetime-local format to MySQL datetime format
-            $tanggal_mulai = str_replace('T', ' ', $data['tanggal_mulai']) . ':00';
-            $tanggal_selesai = str_replace('T', ' ', $data['tanggal_selesai']) . ':00';
+            $tanggal_mulai = str_replace('T', ' ', $data['tanggal_mulai']).':00';
+            $tanggal_selesai = str_replace('T', ' ', $data['tanggal_selesai']).':00';
 
             $tugas = Tugas::create([
                 'user_id' => $data['user_id'],
@@ -47,7 +47,7 @@ class TugasService
             }
 
             // Log activity
-            ActivityLog::log('created', $tugas, 'Membuat tugas baru untuk ' . ($tugas->user?->nama ?? 'N/A'));
+            ActivityLog::log('created', $tugas, 'Membuat tugas baru untuk '.($tugas->user?->nama ?? 'N/A'));
 
             return $tugas;
         });
@@ -63,10 +63,10 @@ class TugasService
 
             // Convert datetime-local format if present
             if (isset($data['tanggal_mulai'])) {
-                $data['tanggal_mulai'] = str_replace('T', ' ', $data['tanggal_mulai']) . ':00';
+                $data['tanggal_mulai'] = str_replace('T', ' ', $data['tanggal_mulai']).':00';
             }
             if (isset($data['tanggal_selesai'])) {
-                $data['tanggal_selesai'] = str_replace('T', ' ', $data['tanggal_selesai']) . ':00';
+                $data['tanggal_selesai'] = str_replace('T', ' ', $data['tanggal_selesai']).':00';
             }
 
             $tugas->update($data);
@@ -88,7 +88,7 @@ class TugasService
     {
         return DB::transaction(function () use ($tugas) {
             // Log activity before soft deletion
-            ActivityLog::log('trashed', $tugas, 'Memindahkan tugas ke trash: ' . $tugas->tugas, [
+            ActivityLog::log('trashed', $tugas, 'Memindahkan tugas ke trash: '.$tugas->tugas, [
                 'tugas_data' => $tugas->toArray(),
             ]);
 
@@ -106,7 +106,7 @@ class TugasService
             $tugas->restore();
 
             // Log activity
-            ActivityLog::log('restored', $tugas, 'Mengembalikan tugas dari trash: ' . $tugas->tugas);
+            ActivityLog::log('restored', $tugas, 'Mengembalikan tugas dari trash: '.$tugas->tugas);
 
             return $tugas;
         });
@@ -128,7 +128,7 @@ class TugasService
             }
 
             // Log activity before permanent deletion
-            ActivityLog::log('deleted', $tugas, 'Menghapus permanen tugas: ' . $tugas->tugas, [
+            ActivityLog::log('deleted', $tugas, 'Menghapus permanen tugas: '.$tugas->tugas, [
                 'tugas_data' => $tugas->toArray(),
             ]);
 
@@ -139,74 +139,99 @@ class TugasService
 
     /**
      * Approve a task.
+     * Returns false when the task is no longer waiting for approval (race guard).
      */
-    public function approveTugas(Tugas $tugas)
+    public function approveTugas(Tugas $tugas): bool
     {
-        $tugas->status = Tugas::STATUS_APPROVED;
-        $tugas->save();
+        return DB::transaction(function () use ($tugas) {
+            $locked = Tugas::whereKey($tugas->getKey())->lockForUpdate()->first();
 
-        // Log activity
-        ActivityLog::log('approved', $tugas, 'Menyetujui tugas dari ' . $tugas->user->nama);
+            if (! $locked || $locked->status !== Tugas::STATUS_SUBMITTED) {
+                return false;
+            }
 
-        // Send notification to user
-        $tugas->load(['user', 'creator']);
-        if ($tugas->user) {
-            $tugas->user->notify(new TaskApproved($tugas));
-        }
+            $locked->status = Tugas::STATUS_APPROVED;
+            $locked->save();
 
-        return $tugas;
+            // Log activity
+            ActivityLog::log('approved', $locked, 'Menyetujui tugas dari '.($locked->user?->nama ?? 'N/A'));
+
+            // Send notification to user
+            $locked->load(['user', 'creator']);
+            if ($locked->user) {
+                $locked->user->notify(new TaskApproved($locked));
+            }
+
+            return true;
+        });
     }
 
     /**
      * Reject a task.
+     * Returns false when the task is no longer waiting for approval (race guard).
      */
     public function rejectTugas(Tugas $tugas, string $catatan)
     {
-        $tugas->status = Tugas::STATUS_REJECTED;
-        $tugas->catatan = $catatan;
-        $tugas->save();
+        return DB::transaction(function () use ($tugas, $catatan) {
+            $locked = Tugas::whereKey($tugas->getKey())->lockForUpdate()->first();
 
-        // Log activity
-        ActivityLog::log('rejected', $tugas, 'Menolak tugas dari ' . $tugas->user->nama, [
-            'catatan' => $catatan,
-        ]);
+            if (! $locked || $locked->status !== Tugas::STATUS_SUBMITTED) {
+                return false;
+            }
 
-        // Send notification to user with rejection reason
-        $tugas->load(['user', 'creator']);
-        if ($tugas->user) {
-            $tugas->user->notify(new TaskRejected($tugas));
-        }
+            $locked->status = Tugas::STATUS_REJECTED;
+            $locked->catatan = $catatan;
+            $locked->save();
 
-        return $tugas;
+            // Log activity
+            ActivityLog::log('rejected', $locked, 'Menolak tugas dari '.($locked->user?->nama ?? 'N/A'), [
+                'catatan' => $catatan,
+            ]);
+
+            // Send notification to user with rejection reason
+            $locked->load(['user', 'creator']);
+            if ($locked->user) {
+                $locked->user->notify(new TaskRejected($locked));
+            }
+
+            return $locked;
+        });
     }
 
     /**
      * Upload result file (for employee).
+     * Returns false when the task no longer accepts uploads (race guard).
      */
     public function uploadResult(Tugas $tugas, $file)
     {
-        $path = $file->store('tugas_karyawan', 'public');
-        $tugas->karyawan_file = $path;
+        return DB::transaction(function () use ($tugas, $file) {
+            $locked = Tugas::whereKey($tugas->getKey())->lockForUpdate()->first();
 
-        $wasSubmitted = false;
-        if ($tugas->status === Tugas::STATUS_PENDING || $tugas->status === Tugas::STATUS_REJECTED) {
-            $tugas->status = Tugas::STATUS_SUBMITTED;
-            $wasSubmitted = true;
-        }
-
-        $tugas->save();
-
-        // Send notification to admin when task is submitted
-        if ($wasSubmitted) {
-            $tugas->load(['user', 'creator']);
-            if ($tugas->creator) {
-                $tugas->creator->notify(new TaskSubmitted($tugas));
+            if (! $locked || ! in_array($locked->status, [Tugas::STATUS_PENDING, Tugas::STATUS_REJECTED], true)) {
+                return false;
             }
 
-            // Log activity
-            ActivityLog::log('submitted', $tugas, 'Karyawan submit tugas: ' . $tugas->tugas);
-        }
+            $oldFile = $locked->karyawan_file;
+            $path = $file->store('tugas_karyawan', 'public');
 
-        return $tugas;
+            $locked->karyawan_file = $path;
+            $locked->status = Tugas::STATUS_SUBMITTED;
+            $locked->save();
+
+            // Remove the previous submission file so rejected re-uploads do not pile up on disk.
+            if ($oldFile) {
+                Storage::disk('public')->delete($oldFile);
+            }
+
+            // Send notification to admin when task is submitted
+            $locked->load(['user', 'creator']);
+            if ($locked->creator) {
+                $locked->creator->notify(new TaskSubmitted($locked));
+            }
+
+            ActivityLog::log('submitted', $locked, 'Karyawan submit tugas: '.$locked->tugas);
+
+            return $locked;
+        });
     }
 }

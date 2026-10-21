@@ -3,15 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, SoftDeletes, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'nama',
@@ -40,6 +40,7 @@ class User extends Authenticatable
         'is_tugas' => 'boolean',
         'is_super_admin' => 'boolean',
         'deleted_at' => 'datetime',
+        'last_seen' => 'datetime',
         'notifications_read_at' => 'datetime',
         'messages_read_at' => 'datetime',
     ];
@@ -106,7 +107,7 @@ class User extends Authenticatable
     public function getProfilePhotoUrlAttribute(): ?string
     {
         return $this->profile_photo_path
-            ? asset('storage/' . $this->profile_photo_path)
+            ? asset('storage/'.$this->profile_photo_path)
             : null;
     }
 }

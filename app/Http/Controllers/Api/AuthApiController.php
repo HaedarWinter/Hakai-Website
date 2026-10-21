@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\LoginThrottle;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -22,11 +23,15 @@ class AuthApiController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            LoginThrottle::hit($request);
+
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
+
+        LoginThrottle::clear($request);
 
         // Hapus token lama untuk mencegah penumpukan
         $user->tokens()->delete();
@@ -45,7 +50,7 @@ class AuthApiController extends Controller
                 'user' => $user,
                 'token' => $token,
                 'token_type' => 'Bearer',
-            ]
+            ],
         ]);
     }
 
@@ -59,7 +64,7 @@ class AuthApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Logout successful'
+            'message' => 'Logout successful',
         ]);
     }
 }

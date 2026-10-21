@@ -48,7 +48,7 @@ class NotificationController extends Controller
                 $notifications[] = [
                     'id' => $task->id,
                     'type' => 'approval',
-                    'message' => "Tugas dari {$task->user->nama} menunggu persetujuan",
+                    'message' => 'Tugas dari '.($task->user?->nama ?? 'Pengguna dihapus').' menunggu persetujuan',
                     'time' => $task->updated_at->diffForHumans(),
                     'icon' => 'fas fa-file-alt',
                     'color' => 'primary',
@@ -78,18 +78,18 @@ class NotificationController extends Controller
 
             foreach ($recentTasks as $task) {
                 $isRead = $lastReadAt && $task->updated_at <= $lastReadAt;
-                $msg = "";
-                $icon = "";
-                $color = "";
+                $msg = '';
+                $icon = '';
+                $color = '';
 
                 if ($task->status == 'pending') {
                     $msg = "Tugas baru: {$task->tugas}";
-                    $icon = "fas fa-tasks";
-                    $color = "warning";
+                    $icon = 'fas fa-tasks';
+                    $color = 'warning';
                 } elseif ($task->status == 'rejected') {
                     $msg = "Tugas ditolak: {$task->tugas}";
-                    $icon = "fas fa-exclamation-circle";
-                    $color = "danger";
+                    $icon = 'fas fa-exclamation-circle';
+                    $color = 'danger';
                 }
 
                 $notifications[] = [
@@ -115,7 +115,7 @@ class NotificationController extends Controller
 
     /**
      * Get comment/message notifications for the authenticated user.
-     * 
+     *
      * Reply notifications are now properly targeted:
      * - If it's a reply, only notify the parent comment author
      * - If it's a top-level comment, notify task owner/creator
@@ -134,10 +134,11 @@ class NotificationController extends Controller
         $query = TaskComment::with([
             'user:id,nama,profile_photo_path',
             'tugas:id,tugas,user_id,created_by',
-            'parent:id,user_id' // Load parent to check reply targeting
+            'parent:id,user_id', // Load parent to check reply targeting
         ])
             ->where('user_id', '!=', $user->id) // Exclude own comments
             ->where('created_at', '>=', now()->subDays(7)) // Last 7 days
+            ->whereHas('user') // Skip comments whose author was deleted
             ->whereHas('tugas') // Ensure task exists (not deleted)
             ->latest('created_at');
 
@@ -196,18 +197,23 @@ class NotificationController extends Controller
 
         foreach ($recentComments as $comment) {
             // Skip if task was deleted (extra safety check)
-            if (!$comment->tugas) {
+            if (! $comment->tugas) {
+                continue;
+            }
+
+            // Skip if the author was deleted between query and render.
+            if (! $comment->user) {
                 continue;
             }
 
             $isRead = $lastReadAt && $comment->created_at <= $lastReadAt;
 
             $taskTitle = strlen($comment->tugas->tugas) > 30
-                ? substr($comment->tugas->tugas, 0, 30) . '...'
+                ? substr($comment->tugas->tugas, 0, 30).'...'
                 : $comment->tugas->tugas;
 
             $contentPreview = strlen($comment->content) > 50
-                ? substr($comment->content, 0, 50) . '...'
+                ? substr($comment->content, 0, 50).'...'
                 : $comment->content;
 
             $messages[] = [

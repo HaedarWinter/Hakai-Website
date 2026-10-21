@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class PasswordResetController extends Controller
 {
@@ -25,6 +26,16 @@ class PasswordResetController extends Controller
      */
     public function sendResetLink(Request $request)
     {
+        $throttleKey = 'password-reset:'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            return back()->withErrors([
+                'email' => 'Terlalu banyak permintaan reset. Silakan coba lagi dalam beberapa menit.',
+            ]);
+        }
+
+        RateLimiter::hit($throttleKey, 60);
+
         $deliveryMethod = $request->input('delivery_method', 'email');
 
         // Validate based on delivery method
@@ -37,24 +48,24 @@ class PasswordResetController extends Controller
 
             // Find user by phone number
             $user = User::where('no_hp', $request->no_hp)->first();
-
-            if (!$user) {
-                return back()->withErrors(['no_hp' => 'Nomor WhatsApp tidak terdaftar di sistem']);
-            }
-
-            $email = $user->email;
         } else {
             $request->validate([
-                'email' => 'required|email|exists:users,email',
+                'email' => 'required|email',
             ], [
                 'email.required' => 'Email tidak boleh kosong',
                 'email.email' => 'Format email tidak valid',
-                'email.exists' => 'Email tidak terdaftar di sistem',
             ]);
 
-            $email = $request->email;
-            $user = User::where('email', $email)->first();
+            $user = User::where('email', $request->email)->first();
         }
+
+        // Same response whether the account exists or not, so the form cannot be
+        // used to discover registered emails or phone numbers.
+        if (! $user) {
+            return back()->with('status', 'Jika data terdaftar, link reset password telah dikirim.');
+        }
+
+        $email = $user->email;
 
         // Delete any existing tokens for this email
         DB::table('password_reset_tokens')->where('email', $email)->delete();
@@ -78,9 +89,9 @@ class PasswordResetController extends Controller
         if ($deliveryMethod === 'whatsapp') {
             // Format phone number for WhatsApp
             $noHp = $user->no_hp;
-            $formattedHp = preg_replace('/\D/', '', $noHp);
+            $formattedHp = preg_replace('/\D/', '', (string) $noHp);
             if (substr($formattedHp, 0, 1) === '0') {
-                $formattedHp = '62' . substr($formattedHp, 1);
+                $formattedHp = '62'.substr($formattedHp, 1);
             }
 
             // Return data for frontend to handle (copy + open WA)
@@ -124,13 +135,11 @@ class PasswordResetController extends Controller
     {
         $request->validate([
             'token' => 'required',
-            'email' => 'required|email|exists:users,email',
-            'password' => 'required|min:8|max:16|confirmed',
+            'email' => 'required|email',
+            'password' => 'required|min:8|confirmed',
         ], [
-            'email.exists' => 'Email tidak terdaftar',
             'password.required' => 'Password tidak boleh kosong',
             'password.min' => 'Password minimal 8 karakter',
-            'password.max' => 'Password maksimal 16 karakter',
             'password.confirmed' => 'Konfirmasi password tidak sama',
         ]);
 
@@ -139,18 +148,19 @@ class PasswordResetController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        if (!$tokenData) {
+        if (! $tokenData) {
             return back()->withErrors(['email' => 'Token reset tidak valid atau sudah kadaluarsa']);
         }
 
         // Check if token matches
-        if (!Hash::check($request->token, $tokenData->token)) {
+        if (! Hash::check($request->token, $tokenData->token)) {
             return back()->withErrors(['email' => 'Token reset tidak valid']);
         }
 
         // Check if token is expired (1 hour)
         if (Carbon::parse($tokenData->created_at)->addHour()->isPast()) {
             DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
             return back()->withErrors(['email' => 'Token reset sudah kadaluarsa. Silakan request ulang.']);
         }
 
@@ -158,6 +168,12 @@ class PasswordResetController extends Controller
         $user = User::where('email', $request->email)->first();
         $user->password = Hash::make($request->password);
         $user->save();
+
+        // Invalidate every existing credential after a password reset.
+        $user->tokens()->delete();
+        if (config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+        }
 
         // Delete token
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Tugas;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class GlobalSearchController extends Controller
@@ -14,40 +14,44 @@ class GlobalSearchController extends Controller
     {
         $query = $request->input('query');
 
-        if (strlen($query) < 2) {
+        if (! is_string($query) || strlen($query) < 2) {
             return response()->json(['tasks' => [], 'users' => []]);
         }
 
-        // Search Tasks (Access Control applied)
+        /** @var User $user */
+        $user = Auth::user();
+
+        // Search Tasks (access control applied)
         $tasksQuery = Tugas::query()
-            ->with(['user:id,nama,profile_photo_path']) // Eager load user for display
+            ->with(['user:id,nama,profile_photo_path'])
             ->where('tugas', 'like', "%{$query}%");
 
-        // If not admin/super-admin, only show own tasks or public tasks (adjust logic as per app rules)
-        $user = Auth::user();
-        if ($user && $user->jabatan === 'karyawan') {
-            $tasksQuery->where(function ($q) use ($user) {
-                $q->where('user_id', $user->id); // Own tasks
-            });
+        if (! $user->isAdmin()) {
+            $tasksQuery->where('user_id', $user->id);
         }
 
         $tasks = $tasksQuery->latest()->take(5)->get(['id', 'tugas', 'status', 'user_id']);
 
-        // Search Users (Admin searches everyone, Employees might search colleagues)
-        $users = User::query()
-            ->where('nama', 'like', "%{$query}%")
-            ->orWhere('email', 'like', "%{$query}%")
-            ->take(5)
-            ->get(['id', 'nama', 'profile_photo_path', 'jabatan', 'email']);
+        // Only admins may search the user directory. Employees would otherwise get
+        // every colleague's id, email and photo from a two-letter query.
+        $users = collect();
+        if ($user->isAdmin()) {
+            $users = User::query()
+                ->where(function ($q) use ($query) {
+                    $q->where('nama', 'like', "%{$query}%")
+                        ->orWhere('email', 'like', "%{$query}%");
+                })
+                ->take(5)
+                ->get(['id', 'nama', 'profile_photo_path', 'jabatan', 'email']);
+        }
 
-        // Format results
         $formattedTasks = $tasks->map(function ($task) {
             return [
                 'type' => 'task',
                 'id' => $task->id,
                 'title' => $task->tugas,
-                'subtitle' => $task->user->nama . ' - ' . ucfirst($task->status),
-                'url' => route('tugas.index') . '?q=' . urlencode($task->tugas)
+                'subtitle' => ($task->user?->nama ?? 'Pengguna dihapus').' - '.ucfirst($task->status),
+                'url' => route('tugas.index').'?q='.urlencode($task->tugas),
             ];
         });
 
@@ -58,13 +62,13 @@ class GlobalSearchController extends Controller
                 'title' => $user->nama,
                 'subtitle' => ucfirst($user->jabatan),
                 'image' => $user->profile_photo_path,
-                'url' => route('profile.show', $user->id)
+                'url' => route('profile.show', $user->id),
             ];
         });
 
         return response()->json([
             'tasks' => $formattedTasks,
-            'users' => $formattedUsers
+            'users' => $formattedUsers,
         ]);
     }
 }

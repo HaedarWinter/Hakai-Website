@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Http\Middleware\LoginThrottle;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,12 +27,11 @@ class AuthController extends Controller
         // Validasi input
         $request->validate([
             'login' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'max:16'],
+            'password' => ['required', 'string', 'min:8'],
         ], [
             'login.required' => 'Email atau Username Tidak Boleh Kosong',
             'password.required' => 'Kata Sandi Tidak Boleh Kosong',
             'password.min' => 'Kata Sandi Minimal 8 Karakter',
-            'password.max' => 'Kata Sandi Maksimal 16 Karakter',
         ]);
 
         // Determine if login input is email or username
@@ -44,7 +43,7 @@ class AuthController extends Controller
         ];
 
         // Cek kredensial
-        if (!Auth::attempt($credentials, $request->filled('remember'))) {
+        if (! Auth::attempt($credentials, $request->filled('remember'))) {
             // Increment failed login attempts
             LoginThrottle::hit($request);
 

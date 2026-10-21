@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 class LoginThrottle
@@ -43,9 +42,9 @@ class LoginThrottle
             }
 
             return redirect()->back()
-                ->withInput($request->only('email'))
+                ->withInput($request->only('login'))
                 ->withErrors([
-                    'email' => "Terlalu banyak percobaan login. Silakan coba lagi dalam {$minutes} menit.",
+                    'login' => "Terlalu banyak percobaan login. Silakan coba lagi dalam {$minutes} menit.",
                     'locked' => true,
                 ]);
         }
@@ -58,10 +57,7 @@ class LoginThrottle
      */
     protected function throttleKey(Request $request): string
     {
-        $email = strtolower($request->input('email', ''));
-        $ip = $request->ip();
-
-        return 'login_attempts:' . sha1($email . '|' . $ip);
+        return self::keyFor($request);
     }
 
     /**
@@ -77,7 +73,8 @@ class LoginThrottle
      */
     protected function availableIn(string $key): int
     {
-        $timer = Cache::get($key . ':timer', now()->timestamp);
+        $timer = Cache::get($key.':timer', now()->timestamp);
+
         return max(0, $timer - now()->timestamp);
     }
 
@@ -86,15 +83,13 @@ class LoginThrottle
      */
     public static function hit(Request $request): void
     {
-        $email = strtolower($request->input('email', ''));
-        $ip = $request->ip();
-        $key = 'login_attempts:' . sha1($email . '|' . $ip);
+        $key = self::keyFor($request);
 
         $attempts = Cache::get($key, 0) + 1;
         $decayMinutes = 5;
 
         Cache::put($key, $attempts, now()->addMinutes($decayMinutes));
-        Cache::put($key . ':timer', now()->addMinutes($decayMinutes)->timestamp, now()->addMinutes($decayMinutes));
+        Cache::put($key.':timer', now()->addMinutes($decayMinutes)->timestamp, now()->addMinutes($decayMinutes));
     }
 
     /**
@@ -102,12 +97,10 @@ class LoginThrottle
      */
     public static function clear(Request $request): void
     {
-        $email = strtolower($request->input('email', ''));
-        $ip = $request->ip();
-        $key = 'login_attempts:' . sha1($email . '|' . $ip);
+        $key = self::keyFor($request);
 
         Cache::forget($key);
-        Cache::forget($key . ':timer');
+        Cache::forget($key.':timer');
     }
 
     /**
@@ -115,13 +108,21 @@ class LoginThrottle
      */
     public static function remainingAttempts(Request $request): int
     {
-        $email = strtolower($request->input('email', ''));
-        $ip = $request->ip();
-        $key = 'login_attempts:' . sha1($email . '|' . $ip);
+        $key = self::keyFor($request);
 
         $maxAttempts = 5;
         $attempts = Cache::get($key, 0);
 
         return max(0, $maxAttempts - $attempts);
+    }
+
+    /**
+     * Static counterpart of throttleKey() used by the controller.
+     */
+    protected static function keyFor(Request $request): string
+    {
+        $identifier = strtolower((string) ($request->input('login') ?? $request->input('email', '')));
+
+        return 'login_attempts:'.sha1($identifier.'|'.$request->ip());
     }
 }
