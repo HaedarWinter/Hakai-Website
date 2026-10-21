@@ -397,6 +397,7 @@
                     if (data.success) {
                         const counter = document.getElementById('message-counter');
                         const list = document.getElementById('message-list');
+                        const pulse = document.getElementById('notification-pulse');
 
                         // Update counter
                         if (data.count > 0) {
