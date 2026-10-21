@@ -1,61 +1,81 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Hakai - Manajemen Tugas
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi manajemen tugas karyawan berbasis Laravel 12. Admin membuat tugas untuk
+karyawan, karyawan mengunggah hasil kerja, admin menyetujui atau menolak dengan
+catatan. Tersedia dashboard statistik, komentar per tugas, notifikasi, trash,
+audit log, serta ekspor PDF/Excel.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.2+, Laravel 12, MySQL (SQLite untuk test)
+- Blade + SB Admin 2, jQuery, DataTables, SweetAlert2, Chart.js
+- Laravel Sanctum (sesi web + bearer token)
+- DomPDF dan Maatwebsite Excel untuk laporan
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Tidak ada build frontend. Semua aset ada di `public/` dan dimuat langsung.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Struktur
 
-## Learning Laravel
+- `routes/web.php` - hanya halaman (view), tanpa logika bisnis
+- `routes/api.php` - seluruh operasi data (JSON)
+- `app/Http/Controllers/Api/` - controller API
+- `app/Services/` - logika tugas dan statistik
+- `app/Policies/TugasPolicy.php` - aturan akses per tugas
+- `public/js/page/`, `public/css/` - aset halaman
+- `public/sw.js` - service worker PWA
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Setup
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan storage:link
+php artisan serve
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Isi kredensial database di `.env`. Jangan pernah commit `.env`.
 
-## Laravel Sponsors
+## Environment penting
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+| Variabel | Fungsi |
+|---|---|
+| `APP_URL` | URL aplikasi; dipakai CORS dan tautan reset password |
+| `DB_*` | Koneksi database |
+| `SESSION_ENCRYPT` | Default `true`; enkripsi payload sesi |
+| `SANCTUM_EXPIRATION` | Umur token API dalam menit, default `480` |
+| `CORS_ALLOWED_ORIGINS` | Daftar origin tambahan dipisah koma |
+| `QUEUE_CONNECTION` | Notifikasi email memakai queue; `sync` cukup untuk dev |
 
-### Premium Partners
+## Perintah
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+php artisan test                 # seluruh test
+php artisan test --filter=TaskTest
+vendor/bin/pint --dirty          # format file yang berubah
+php artisan tugas:prune-trash    # hapus permanen trash > 30 hari (terjadwal harian)
+php artisan optimize:clear       # setelah mengubah config/route
+```
 
-## Contributing
+## Aturan keamanan yang berlaku
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- Upload hanya menerima dokumen/gambar tertentu (lihat validasi `mimes` di
+  `TugasApiController` dan `SettingsApiController`). SVG dan PHP ditolak.
+- File unggahan disimpan di disk `public`, tetapi Nginx memblokir eksekusi PHP
+  di `/storage/`.
+- Semua endpoint komentar dan detail tugas memakai `TugasPolicy`.
+- Reset password selalu memberi pesan generik dan dibatasi 5 permintaan/menit/IP.
+- Login dibatasi 5 percobaan per kombinasi identitas + IP.
+- Mengganti atau mereset password mencabut token dan sesi lain.
+- API yang memakai cookie sesi tunduk pada CSRF (`statefulApi()`).
 
-## Code of Conduct
+## Catatan operasional
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Endpoint daftar memakai `per_page` dengan batas 1000. Halaman admin meminta
+  1000 baris; bila data melewati batas itu, UI perlu dipindah ke paginasi server.
+- Tabel `notifications` adalah sisa kanal database lama. Kanal sudah dihapus dari
+  semua kelas notifikasi; tabel boleh dibersihkan saat migrasi berikutnya.
+- Blok JavaScript karyawan pada `resources/views/karyawan/tugas/index.blade.php`
+  masih menduplikasi sebagian `public/js/page/admin/tugas/index.js`. Ekstraksi ke
+  satu berkas bersama belum dilakukan karena berisiko tanpa uji browser.
