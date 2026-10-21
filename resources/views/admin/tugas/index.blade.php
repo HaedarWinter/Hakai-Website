@@ -547,7 +547,6 @@
 @endsection
 
 @section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <script src="{{ asset('js/export-handler.js') }}"></script>
     <script src="{{ asset('js/page/admin/tugas/index.js') }}"></script>
 @endsection

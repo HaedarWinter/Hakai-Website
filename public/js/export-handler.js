@@ -32,25 +32,42 @@
             timer: 1500
         });
 
-        // Create hidden iframe for download
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
+        // Fetch first so a failed export shows an error instead of a fake success.
+        fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
 
-        // Show success toast after a short delay
-        setTimeout(() => {
-            Toast.fire({
-                icon: 'success',
-                title: `Export ${type} berhasil!`,
-                text: 'File akan segera diunduh'
+                const blob = await response.blob();
+                const disposition = response.headers.get('Content-Disposition') || '';
+                const match = /filename="?([^";]+)"?/.exec(disposition);
+                const filename = match ? match[1] : `${type}-export`;
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(link.href);
+
+                Toast.fire({
+                    icon: 'success',
+                    title: `Export ${type} berhasil!`,
+                    text: 'File akan segera diunduh'
+                });
+            })
+            .catch(() => {
+                Toast.fire({
+                    icon: 'error',
+                    title: `Export ${type} gagal`,
+                    text: 'Silakan coba lagi'
+                });
             });
-
-            // Remove iframe after download starts
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 2000);
-        }, 1000);
     }
 
     /**

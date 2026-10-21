@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hakai-cache-v2';
+const CACHE_NAME = 'hakai-cache-v3';
 const urlsToCache = [
     '/',
     '/css/custom-sidebar.css',
@@ -21,12 +21,13 @@ self.addEventListener('install', event => {
             })
             .catch(err => console.log('Cache install failed:', err))
     );
+    self.skipWaiting();
 });
 
 // Fetch event
-// Fetch event - Network First for HTML, Cache First for assets
+// Network First for HTML. Stale-while-revalidate for assets so a CSS change
+// shows up on the next load instead of waiting for a manual version bump.
 self.addEventListener('fetch', event => {
-    // Only handle http/https requests
     if (!event.request.url.startsWith('http')) {
         return;
     }
@@ -36,47 +37,41 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    const isHTML = event.request.headers.get('accept').includes('text/html');
+    const accept = event.request.headers.get('accept') || '';
+    const isHTML = accept.includes('text/html');
 
     if (isHTML) {
-        // Network First for HTML
         event.respondWith(
             fetch(event.request)
                 .then(response => {
-                    // Cache the fresh copy
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME).then(cache => {
                         cache.put(event.request, responseToCache);
                     });
                     return response;
                 })
-                .catch(() => {
-                    // If network fails, try cache
-                    return caches.match(event.request);
-                })
+                .catch(() => caches.match(event.request))
         );
-    } else {
-        // Cache First for Assets (CSS, JS, Images, etc.)
-        event.respondWith(
-            caches.match(event.request)
+        return;
+    }
+
+    event.respondWith(
+        caches.match(event.request).then(cached => {
+            const network = fetch(event.request)
                 .then(response => {
-                    if (response) {
-                        return response;
-                    }
-                    return fetch(event.request).then(response => {
-                        // Cache the new asset
-                        if (!response || response.status !== 200 || response.type !== 'basic') {
-                            return response;
-                        }
+                    if (response && response.status === 200 && response.type === 'basic') {
                         const responseToCache = response.clone();
                         caches.open(CACHE_NAME).then(cache => {
                             cache.put(event.request, responseToCache);
                         });
-                        return response;
-                    });
+                    }
+                    return response;
                 })
-        );
-    }
+                .catch(() => cached);
+
+            return cached || network;
+        })
+    );
 });
 
 // Activate event - clean up old caches
@@ -91,6 +86,6 @@ self.addEventListener('activate', event => {
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
 });
