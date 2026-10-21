@@ -49,12 +49,21 @@ class StatisticsService
         $adminCount = $users->where('jabatan', 'Admin')->count();
         $userCount = $users->whereNotIn('jabatan', ['Admin'])->count();
 
-        $nonAdminUsers = $users->whereNotIn('jabatan', ['Admin']);
-        $tugasSelesai = $nonAdminUsers->where('is_tugas', true)->count();
-        $tugasBelumSelesai = $nonAdminUsers->where('is_tugas', false)->count();
+        $nonAdminUsers = $users->whereNotIn('jabatan', ['Admin'])->values();
 
-        $userDitugaskan = $users->whereNotIn('jabatan', ['Admin'])->where('is_tugas', true)->count();
-        $userBelumDitugaskan = $users->whereNotIn('jabatan', ['Admin'])->where('is_tugas', false)->count();
+        // Callers normally eager-load task counts. Load them once here when missing.
+        if ($nonAdminUsers->isNotEmpty() && ! array_key_exists('total_tugas', $nonAdminUsers->first()->getAttributes())) {
+            $nonAdminUsers->loadCount([
+                'tugas as total_tugas',
+                'tugas as tugas_selesai' => fn ($query) => $query->where('status', 'approved'),
+            ]);
+        }
+
+        $tugasSelesai = $nonAdminUsers->filter(fn ($u) => ($u->total_tugas ?? 0) > 0 && ($u->tugas_selesai ?? 0) > 0)->count();
+        $tugasBelumSelesai = $nonAdminUsers->count() - $tugasSelesai;
+
+        $userDitugaskan = $nonAdminUsers->filter(fn ($u) => ($u->total_tugas ?? 0) > 0)->count();
+        $userBelumDitugaskan = $nonAdminUsers->count() - $userDitugaskan;
 
         return [
             'total' => $users->count(),
@@ -71,7 +80,7 @@ class StatisticsService
                 ? round(($userDitugaskan / $userCount) * 100, 1)
                 : 0,
             'jabatan_list' => $users->pluck('jabatan')->unique()->values()->toArray(),
-            'updated_at' => now()->format('d F Y H:i:s')
+            'updated_at' => now()->format('d F Y H:i:s'),
         ];
     }
 
@@ -86,7 +95,7 @@ class StatisticsService
         // Ensure we have a user
         $user = $user ?? auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             return [
                 'total_tugas' => 0,
                 'total_users' => 0,
@@ -117,19 +126,22 @@ class StatisticsService
         }
 
         // Clone query for counts to avoid modifying the base query object reference issues if any
-        $totalTugas = (clone $query)->count();
-        $totalSelesai = (clone $query)->where('status', 'approved')->count();
-        $totalPending = (clone $query)->where('status', 'pending')->count();
-        $totalSubmitted = (clone $query)->where('status', 'submitted')->count();
-        $totalRejected = (clone $query)->where('status', 'rejected')->count();
+        $row = (clone $query)->selectRaw(
+            'COUNT(*) as total,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as submitted,
+             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected',
+            [Tugas::STATUS_APPROVED, Tugas::STATUS_PENDING, Tugas::STATUS_SUBMITTED, Tugas::STATUS_REJECTED]
+        )->first();
 
         return [
-            'total_tugas' => $totalTugas,
+            'total_tugas' => (int) ($row->total ?? 0),
             'total_users' => $totalUsers,
-            'total_selesai' => $totalSelesai,
-            'total_pending' => $totalPending,
-            'total_submitted' => $totalSubmitted,
-            'total_rejected' => $totalRejected,
+            'total_selesai' => (int) ($row->approved ?? 0),
+            'total_pending' => (int) ($row->pending ?? 0),
+            'total_submitted' => (int) ($row->submitted ?? 0),
+            'total_rejected' => (int) ($row->rejected ?? 0),
         ];
     }
 
@@ -161,57 +173,56 @@ class StatisticsService
             ->take($limit)
             ->get();
     }
+
     /**
      * Get task trend for the last 7 days based on scope.
      */
     public function getTaskTrend(?User $user = null, string $scope = 'global'): array
     {
         $user = $user ?? auth()->user();
+
+        $start = now()->subDays(6)->startOfDay();
+
+        // One grouped query per series instead of two queries per day (14 per request).
+        $newQuery = Tugas::where('created_at', '>=', $start)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day');
+
+        $completedQuery = Tugas::where('status', Tugas::STATUS_APPROVED)
+            ->where('updated_at', '>=', $start)
+            ->selectRaw('DATE(updated_at) as day, COUNT(*) as total')
+            ->groupBy('day');
+
+        if ($user->isAdmin()) {
+            if ($scope === 'personal') {
+                $newQuery->where('created_by', $user->id);
+                $completedQuery->where('created_by', $user->id);
+            }
+        } else {
+            $newQuery->where('user_id', $user->id);
+            $completedQuery->where('user_id', $user->id);
+        }
+
+        $newByDay = $newQuery->pluck('total', 'day');
+        $completedByDay = $completedQuery->pluck('total', 'day');
+
         $dates = [];
         $completedData = [];
         $newData = [];
 
         for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->format('Y-m-d');
-            $dates[] = now()->subDays($i)->locale('id')->isoFormat('D MMM');
+            $day = now()->subDays($i);
+            $key = $day->format('Y-m-d');
 
-            // New tasks created on this date
-            $query = Tugas::whereNull('deleted_at')
-                ->whereDate('created_at', $date);
-
-            // Admin logic
-            if ($user->isAdmin()) {
-                if ($scope === 'personal') {
-                    $query->where('created_by', $user->id);
-                }
-            } else {
-                // Employee logic
-                $query->where('user_id', $user->id);
-            }
-            $newData[] = $query->count();
-
-            // Completed (approved) tasks on this date
-            $queryCompleted = Tugas::whereNull('deleted_at')
-                ->where('status', 'approved')
-                ->whereDate('updated_at', $date);
-
-            // Admin logic
-            if ($user->isAdmin()) {
-                if ($scope === 'personal') {
-                    $queryCompleted->where('created_by', $user->id);
-                }
-            } else {
-                // Employee logic
-                $queryCompleted->where('user_id', $user->id);
-            }
-            $completedData[] = $queryCompleted->count();
+            $dates[] = $day->locale('id')->isoFormat('D MMM');
+            $completedData[] = (int) ($completedByDay[$key] ?? 0);
+            $newData[] = (int) ($newByDay[$key] ?? 0);
         }
 
         return [
             'labels' => $dates,
             'completed' => $completedData,
-            'new' => $newData
+            'new' => $newData,
         ];
     }
 }
-

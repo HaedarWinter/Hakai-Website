@@ -185,7 +185,6 @@
 @endsection
 
 @section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <script src="{{ asset('js/export-handler.js') }}"></script>
     <script>
         $(document).ready(function () {
@@ -218,7 +217,7 @@
             // Load users data
             function loadUsers() {
                 $.ajax({
-                    url: "/api/users",
+                    url: "/api/users?per_page=1000",
                     type: "GET",
                     dataType: "json",
                     cache: false, // Disable caching

@@ -88,7 +88,6 @@
 @endsection
 
 @section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <script>
         $(document).ready(function () {
             // Initialize DataTable
@@ -103,7 +102,7 @@
             // Load trashed tasks
             function loadTrash() {
                 $.ajax({
-                    url: "/api/tugas/trash/list",
+                    url: "/api/tugas/trash/list?per_page=1000",
                     type: "GET",
                     dataType: "json",
                     cache: false,

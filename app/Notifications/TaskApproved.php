@@ -29,7 +29,7 @@ class TaskApproved extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['mail'];
     }
 
     /**
@@ -40,12 +40,12 @@ class TaskApproved extends Notification implements ShouldQueue
         $adminName = $this->tugas->creator?->nama ?? 'Admin';
 
         return (new MailMessage)
-            ->subject('✅ Tugas Disetujui: ' . $this->tugas->tugas)
-            ->greeting('Selamat ' . $notifiable->nama . '! 🎉')
-            ->line('Tugas Anda telah disetujui oleh ' . $adminName . '.')
+            ->subject('✅ Tugas Disetujui: '.$this->tugas->tugas)
+            ->greeting('Selamat '.$notifiable->nama.'! 🎉')
+            ->line('Tugas Anda telah disetujui oleh '.$adminName.'.')
             ->line('')
             ->line('**Detail Tugas:**')
-            ->line('📌 ' . $this->tugas->tugas)
+            ->line('📌 '.$this->tugas->tugas)
             ->line('✅ Status: Disetujui')
             ->action('Lihat Detail', url('/tugas'))
             ->line('')
@@ -64,7 +64,7 @@ class TaskApproved extends Notification implements ShouldQueue
             'tugas_id' => $this->tugas->id,
             'tugas' => $this->tugas->tugas,
             'type' => 'task_approved',
-            'message' => 'Tugas Anda telah disetujui: ' . $this->tugas->tugas,
+            'message' => 'Tugas Anda telah disetujui: '.$this->tugas->tugas,
             'approved_by' => $this->tugas->creator?->nama,
         ];
     }

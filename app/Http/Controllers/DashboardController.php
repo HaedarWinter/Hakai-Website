@@ -36,15 +36,9 @@ class DashboardController extends Controller
 
         $stats = $this->statsService->getDashboardStats($user, $scope);
 
-        // DEBUG: Add user info to response temporarily
-        $stats['_debug_user_id'] = $user ? $user->id : null;
-        $stats['_debug_user_nama'] = $user ? $user->nama : null;
-        $stats['_debug_user_jabatan'] = $user ? $user->jabatan : null;
-        $stats['_debug_scope'] = $scope;
-
         return response()->json([
             'success' => true,
-            'data' => $stats
+            'data' => $stats,
         ]);
     }
 
@@ -60,7 +54,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $tasks
+            'data' => $tasks,
         ]);
     }
 
@@ -76,7 +70,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $trend
+            'data' => $trend,
         ]);
     }
 
@@ -94,7 +88,7 @@ class DashboardController extends Controller
                 'stats' => $this->statsService->getDashboardStats($user, $scope),
                 'recent_tasks' => $this->statsService->getRecentTasks($user, 5, $scope),
                 'trend' => $this->statsService->getTaskTrend($user, $scope),
-            ]
+            ],
         ]);
     }
 }

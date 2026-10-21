@@ -29,7 +29,7 @@ class NewTaskAssigned extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['mail'];
     }
 
     /**
@@ -41,14 +41,14 @@ class NewTaskAssigned extends Notification implements ShouldQueue
         $deadline = $this->tugas->tanggal_selesai?->format('d M Y, H:i') ?? '-';
 
         return (new MailMessage)
-            ->subject('📋 Tugas Baru Diberikan: ' . $this->tugas->tugas)
-            ->greeting('Halo ' . $notifiable->nama . '!')
-            ->line('Anda mendapatkan tugas baru dari ' . $adminName . '.')
+            ->subject('📋 Tugas Baru Diberikan: '.$this->tugas->tugas)
+            ->greeting('Halo '.$notifiable->nama.'!')
+            ->line('Anda mendapatkan tugas baru dari '.$adminName.'.')
             ->line('')
             ->line('**Detail Tugas:**')
-            ->line('📌 ' . $this->tugas->tugas)
-            ->line('📅 Deadline: ' . $deadline)
-            ->line('⚡ Prioritas: ' . ucfirst($this->tugas->priority ?? 'medium'))
+            ->line('📌 '.$this->tugas->tugas)
+            ->line('📅 Deadline: '.$deadline)
+            ->line('⚡ Prioritas: '.ucfirst($this->tugas->priority ?? 'medium'))
             ->action('Lihat Tugas', url('/tugas'))
             ->line('')
             ->line('Segera kerjakan tugas ini sebelum deadline!')
@@ -66,7 +66,7 @@ class NewTaskAssigned extends Notification implements ShouldQueue
             'tugas_id' => $this->tugas->id,
             'tugas' => $this->tugas->tugas,
             'type' => 'new_task',
-            'message' => 'Anda mendapatkan tugas baru: ' . $this->tugas->tugas,
+            'message' => 'Anda mendapatkan tugas baru: '.$this->tugas->tugas,
             'created_by' => $this->tugas->creator?->nama,
         ];
     }

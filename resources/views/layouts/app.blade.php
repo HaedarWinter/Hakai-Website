@@ -358,32 +358,7 @@
             }
         });
 
-        // Load pending approval count for admin
-        @if(auth()->user()->isAdmin())
-            function loadPendingApprovalCount() {
-                $.ajax({
-                    url: '/api/tugas',
-                    type: 'GET',
-                    success: function (res) {
-                        if (res.success) {
-                            let pendingCount = res.data.filter(t => t.status === 'submitted').length;
-                            if (pendingCount > 0) {
-                                $('#pending-approval-badge').text(pendingCount).show();
-                            } else {
-                                $('#pending-approval-badge').hide();
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Load on page load
-            $(document).ready(function () {
-                loadPendingApprovalCount();
-                // Refresh every minute
-                setInterval(loadPendingApprovalCount, 60000);
-            });
-        @endif
+        // Pending approval badge is updated by the notification poll in the header.
 
         // Handle 401 Unauthorized responses (tampilkan sekali saja & paksa logout web session)
         let isSessionExpired = false;

@@ -29,7 +29,7 @@ class TaskSubmitted extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['mail'];
     }
 
     /**
@@ -40,13 +40,13 @@ class TaskSubmitted extends Notification implements ShouldQueue
         $employeeName = $this->tugas->user?->nama ?? 'Karyawan';
 
         return (new MailMessage)
-            ->subject('📤 Tugas Disubmit: ' . $this->tugas->tugas)
-            ->greeting('Halo ' . $notifiable->nama . '!')
-            ->line($employeeName . ' telah mensubmit tugas yang perlu Anda review.')
+            ->subject('📤 Tugas Disubmit: '.$this->tugas->tugas)
+            ->greeting('Halo '.$notifiable->nama.'!')
+            ->line($employeeName.' telah mensubmit tugas yang perlu Anda review.')
             ->line('')
             ->line('**Detail Tugas:**')
-            ->line('📌 ' . $this->tugas->tugas)
-            ->line('👤 Dikerjakan oleh: ' . $employeeName)
+            ->line('📌 '.$this->tugas->tugas)
+            ->line('👤 Dikerjakan oleh: '.$employeeName)
             ->action('Review Tugas', url('/tugas'))
             ->line('')
             ->line('Silakan review dan berikan persetujuan atau catatan.')
@@ -64,7 +64,7 @@ class TaskSubmitted extends Notification implements ShouldQueue
             'tugas_id' => $this->tugas->id,
             'tugas' => $this->tugas->tugas,
             'type' => 'task_submitted',
-            'message' => $this->tugas->user?->nama . ' telah mensubmit tugas: ' . $this->tugas->tugas,
+            'message' => $this->tugas->user?->nama.' telah mensubmit tugas: '.$this->tugas->tugas,
             'submitted_by' => $this->tugas->user?->nama,
         ];
     }

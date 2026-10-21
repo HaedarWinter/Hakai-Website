@@ -29,7 +29,7 @@ class TaskRejected extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['mail'];
     }
 
     /**
@@ -41,16 +41,16 @@ class TaskRejected extends Notification implements ShouldQueue
         $catatan = $this->tugas->catatan ?? 'Tidak ada catatan';
 
         return (new MailMessage)
-            ->subject('❌ Tugas Ditolak: ' . $this->tugas->tugas)
-            ->greeting('Halo ' . $notifiable->nama . '!')
-            ->line('Mohon maaf, tugas Anda ditolak oleh ' . $adminName . '.')
+            ->subject('❌ Tugas Ditolak: '.$this->tugas->tugas)
+            ->greeting('Halo '.$notifiable->nama.'!')
+            ->line('Mohon maaf, tugas Anda ditolak oleh '.$adminName.'.')
             ->line('')
             ->line('**Detail Tugas:**')
-            ->line('📌 ' . $this->tugas->tugas)
+            ->line('📌 '.$this->tugas->tugas)
             ->line('❌ Status: Ditolak')
             ->line('')
             ->line('**Catatan dari Admin:**')
-            ->line('💬 ' . $catatan)
+            ->line('💬 '.$catatan)
             ->action('Perbaiki & Submit Ulang', url('/tugas'))
             ->line('')
             ->line('Silakan perbaiki sesuai catatan dan submit ulang.')
@@ -68,7 +68,7 @@ class TaskRejected extends Notification implements ShouldQueue
             'tugas_id' => $this->tugas->id,
             'tugas' => $this->tugas->tugas,
             'type' => 'task_rejected',
-            'message' => 'Tugas Anda ditolak: ' . $this->tugas->tugas,
+            'message' => 'Tugas Anda ditolak: '.$this->tugas->tugas,
             'catatan' => $this->tugas->catatan,
             'rejected_by' => $this->tugas->creator?->nama,
         ];

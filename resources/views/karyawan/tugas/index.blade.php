@@ -479,7 +479,6 @@
     </style>
 @endsection
 @section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <script src="{{ asset('js/export-handler.js') }}"></script>
     <script>
         $(document).ready(function () {
@@ -547,7 +546,7 @@
             // Load Tasks
             function loadTasks() {
                 $.ajax({
-                    url: "/api/tugas",
+                    url: "/api/tugas?per_page=1000",
                     type: "GET",
                     dataType: "json",
                     cache: false,
@@ -1702,7 +1701,7 @@
         }
 
         html.dark-mode .bg-success-light {
-            background: rgba(34, 197, 9 green, 0.2) !important;
+            background: rgba(34, 197, 94, 0.2) !important;
         }
 
         html.dark-mode .bg-danger-light {

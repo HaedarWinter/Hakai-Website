@@ -384,9 +384,6 @@
         // Load immediately
         loadNotifications();
 
-        // Poll every 60 seconds
-        setInterval(loadNotifications, 60000);
-
         // =============== MESSAGE NOTIFICATIONS ===============
         function loadMessages() {
             fetch('/api/messages', {
@@ -405,8 +402,21 @@
                         if (data.count > 0) {
                             counter.innerText = data.count > 9 ? '9+' : data.count;
                             counter.style.display = 'inline-block';
+                            pulse.style.display = 'block';
                         } else {
                             counter.style.display = 'none';
+                            pulse.style.display = 'none';
+                        }
+
+                        // Sidebar approval badge shares the same count; no extra /api/tugas call.
+                        const approvalBadge = document.getElementById('pending-approval-badge');
+                        if (approvalBadge) {
+                            if (data.count > 0) {
+                                approvalBadge.innerText = data.count > 9 ? '9+' : data.count;
+                                approvalBadge.style.display = 'inline-block';
+                            } else {
+                                approvalBadge.style.display = 'none';
+                            }
                         }
 
                         // Update list
@@ -546,8 +556,20 @@
         // Load messages immediately
         loadMessages();
 
-        // Poll messages every 60 seconds
-        setInterval(loadMessages, 60000);
+        // Single poller for header data, paused while the tab is hidden.
+        if (window.headerPoller) clearInterval(window.headerPoller);
+        window.headerPoller = setInterval(function () {
+            if (document.hidden) return;
+            loadNotifications();
+            loadMessages();
+        }, 60000);
+
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) {
+                loadNotifications();
+                loadMessages();
+            }
+        });
     });
 </script>
 

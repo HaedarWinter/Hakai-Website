@@ -13,7 +13,9 @@ class TaskStatusChanged extends Notification implements ShouldQueue
     use Queueable;
 
     protected Tugas $tugas;
+
     protected string $status;
+
     protected ?string $reason;
 
     /**
@@ -33,7 +35,7 @@ class TaskStatusChanged extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['mail'];
     }
 
     /**
@@ -44,26 +46,26 @@ class TaskStatusChanged extends Notification implements ShouldQueue
         $isApproved = $this->status === 'approved';
 
         $subject = $isApproved
-            ? '✅ Tugas Disetujui: ' . $this->tugas->tugas
-            : '❌ Tugas Ditolak: ' . $this->tugas->tugas;
+            ? '✅ Tugas Disetujui: '.$this->tugas->tugas
+            : '❌ Tugas Ditolak: '.$this->tugas->tugas;
 
         $mail = (new MailMessage)
             ->subject($subject)
-            ->greeting('Halo, ' . $notifiable->nama . '!');
+            ->greeting('Halo, '.$notifiable->nama.'!');
 
         if ($isApproved) {
             $mail->line('🎉 Selamat! Tugas Anda telah **disetujui**.')
                 ->line('')
-                ->line('**📌 Tugas:** ' . $this->tugas->tugas)
+                ->line('**📌 Tugas:** '.$this->tugas->tugas)
                 ->line('')
                 ->line('Terima kasih atas kerja keras Anda!');
         } else {
             $mail->line('Maaf, tugas Anda telah **ditolak**.')
                 ->line('')
-                ->line('**📌 Tugas:** ' . $this->tugas->tugas);
+                ->line('**📌 Tugas:** '.$this->tugas->tugas);
 
             if ($this->reason) {
-                $mail->line('**📝 Alasan:** ' . $this->reason);
+                $mail->line('**📝 Alasan:** '.$this->reason);
             }
 
             $mail->line('')
@@ -90,8 +92,8 @@ class TaskStatusChanged extends Notification implements ShouldQueue
             'status' => $this->status,
             'type' => $isApproved ? 'task_approved' : 'task_rejected',
             'message' => $isApproved
-                ? 'Tugas Anda disetujui: ' . $this->tugas->tugas
-                : 'Tugas Anda ditolak: ' . $this->tugas->tugas,
+                ? 'Tugas Anda disetujui: '.$this->tugas->tugas
+                : 'Tugas Anda ditolak: '.$this->tugas->tugas,
             'reason' => $this->reason,
         ];
     }

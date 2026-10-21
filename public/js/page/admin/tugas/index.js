@@ -166,7 +166,7 @@ $(document).ready(function () {
         showLoading();
 
         $.ajax({
-            url: "/api/tugas?_t=" + Date.now(),
+            url: "/api/tugas?per_page=1000&_t=" + Date.now(),
             type: "GET",
             dataType: "json",
             cache: false,
@@ -329,6 +329,7 @@ $(document).ready(function () {
     function startAutoRefresh() {
         if (State.intervalId) clearInterval(State.intervalId);
         State.intervalId = setInterval(() => {
+            if (document.hidden) return;
             if (!State.hasError) loadTasks();
         }, 30000);
     }
