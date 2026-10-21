@@ -264,22 +264,22 @@ $(document).ready(function () {
                             const overdueDays = Math.abs(diffDays);
 
                             if (overdueDays >= 1) {
-                                return { class: 'overdue', text: `Terlambat ${overdueDays} hari`, isOverdue: true, priority: 0 };
+                                return { class: 'overdue', text: `Telat ${overdueDays} hari`, isOverdue: true, priority: 0 };
                             } else if (overdueHours >= 1) {
-                                return { class: 'overdue', text: `Terlambat ${overdueHours} jam`, isOverdue: true, priority: 0 };
+                                return { class: 'overdue', text: `Telat ${overdueHours} jam`, isOverdue: true, priority: 0 };
                             } else {
-                                return { class: 'overdue', text: `Terlambat ${overdueMins} menit`, isOverdue: true, priority: 0 };
+                                return { class: 'overdue', text: `Telat ${overdueMins} mnt`, isOverdue: true, priority: 0 };
                             }
                         }
 
                         // Same day - check hours left
                         if (diffDays === 0) {
                             if (diffHours < 1) {
-                                return { class: 'urgent', text: `${diffMins} menit lagi!`, isOverdue: false, priority: 1 };
+                                return { class: 'urgent', text: `${diffMins} mnt lagi`, isOverdue: false, priority: 1 };
                             } else if (diffHours < 3) {
-                                return { class: 'urgent', text: `${diffHours} jam lagi!`, isOverdue: false, priority: 2 };
+                                return { class: 'urgent', text: `${diffHours} jam lagi`, isOverdue: false, priority: 2 };
                             } else {
-                                return { class: 'urgent', text: `Hari ini (${diffHours} jam)`, isOverdue: false, priority: 3 };
+                                return { class: 'urgent', text: `${diffHours} jam lagi`, isOverdue: false, priority: 3 };
                             }
                         }
 
@@ -346,7 +346,7 @@ $(document).ready(function () {
                                             <span class="text-muted text-truncate" style="font-size: 0.65rem;">${task.user ? task.user.nama : 'N/A'}</span>
                                         </div>
                                     </div>
-                                    <div class="text-right ml-2 border-left pl-2">
+                                    <div class="text-right ml-2 pl-2 border-left flex-shrink-0">
                                         <div class="deadline-countdown ${info.class} px-2 py-1" style="font-size: 0.6rem; border-radius: 4px;">
                                             ${info.text}
                                         </div>
