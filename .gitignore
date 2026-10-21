@@ -1,5 +1,7 @@
 *.log
 .DS_Store
+/AGENTS.md
+/LAPORAN_PKL.md
 .env
 .env.backup
 .env.production
