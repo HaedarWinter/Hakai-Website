@@ -175,7 +175,7 @@
                         </h6>
                     </div>
                     <div class="card-body p-4 pt-1">
-                        <div class="activity-timeline" id="activity-log" style="max-height: 220px; overflow-y: auto;">
+                        <div id="activity-log" style="max-height: 220px; overflow-y: auto;">
                             <!-- Activity items will be loaded here -->
                             <div class="text-center py-3">
                                 <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
@@ -268,7 +268,7 @@
 
             <div class="{{ Auth::user()->isAdmin() ? 'col-lg-6' : 'col-12' }} mb-4 animate-in"
                 style="animation-delay: 0.7s">
-                <div class="premium-card h-100">
+                <div class="premium-card">
                     <div
                         class="card-header bg-transparent border-0 pt-4 px-4 d-flex align-items-center justify-content-between">
                         <h6 class="m-0 font-weight-bold text-primary">

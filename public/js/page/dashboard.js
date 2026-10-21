@@ -108,24 +108,23 @@ $(document).ready(function () {
                     <div class="list-group-item list-group-item-action px-3 py-3 border-0 mb-2 shadow-sm rounded-lg" 
                          style="transition: transform 0.2s; cursor: pointer; background: var(--glass-bg);">
                         <div class="d-flex align-items-center">
-                            <div class="mr-3">
+                            <div class="mr-3 flex-shrink-0">
                                 <div class="icon-circle-sm bg-light shadow-sm">
                                     <i class="fas ${iconClass}"></i>
                                 </div>
                             </div>
                             <div class="flex-grow-1 min-width-0">
-                                <div class="font-weight-bold text-dark text-truncate mb-0" style="display: block;">${task.tugas}</div>
-                                <div class="text-muted small text-truncate">
-                                    <i class="fas fa-user-circle mr-1"></i> ${task.user ? task.user.nama : 'System'}
-                                </div>
-                            </div>
-                            <div class="text-right ml-2">
-                                <span class="status-pill-premium status-pill-${statusClass}" style="font-size: 0.65rem;">
-                                    ${statusBadge}
-                                </span>
-                                <div class="text-gray-400 mt-1" style="font-size: 0.6rem;">
+                                <div class="font-weight-bold text-dark text-truncate mb-1" style="display: block;">${task.tugas}</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.7rem;">
+                                    <i class="fas fa-user-circle mr-1"></i>${task.user ? task.user.nama : 'System'}
+                                    <span class="mx-1">&middot;</span>
                                     <i class="fas fa-clock mr-1"></i>${new Date(task.created_at).toLocaleDateString('id-ID')}
                                 </div>
+                            </div>
+                            <div class="text-right ml-2 flex-shrink-0">
+                                <span class="status-pill-premium status-pill-${statusClass}" style="font-size: 0.65rem; white-space: nowrap;">
+                                    ${statusBadge}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -154,34 +153,34 @@ $(document).ready(function () {
                 let activityClass = 'primary';
 
                 if (task.status === 'approved') {
-                    activityText = 'Tugas disetujui'; activityClass = 'success';
+                    activityText = 'Disetujui'; activityClass = 'success';
                 } else if (task.status === 'submitted') {
-                    activityText = 'Tugas disubmit'; activityClass = 'info';
+                    activityText = 'Disubmit'; activityClass = 'info';
                 } else if (task.status === 'rejected') {
-                    activityText = 'Tugas ditolak'; activityClass = 'danger';
+                    activityText = 'Ditolak'; activityClass = 'danger';
                 } else {
-                    activityText = 'Tugas baru dibuat'; activityClass = 'warning';
+                    activityText = 'Dibuat'; activityClass = 'warning';
                 }
 
                 const timeAgo = getTimeAgo(new Date(task.updated_at || task.created_at));
                 const creator = task.creator || { nama: 'System', profile_photo_path: null };
-                const avatarUrl = creator.profile_photo_path ? `/storage/${creator.profile_photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.nama)}&background=random&color=fff`;
+                const initial = creator.nama.charAt(0).toUpperCase();
+                const avatar = creator.profile_photo_path
+                    ? `<img src="/storage/${creator.profile_photo_path}" class="rounded-circle border border-white shadow-sm flex-shrink-0" style="width: 32px; height: 32px; object-fit: cover;" alt="${creator.nama}">`
+                    : `<div class="rounded-circle border border-white shadow-sm flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: #d1fae5; color: #047857; font-size: 0.7rem; font-weight: 700;">${initial}</div>`;
 
                 html += `
-                    <div class="activity-bubble d-flex align-items-center justify-content-between p-3 mb-2" style="animation: fadeInUpSlight 0.4s ease forwards; animation-delay: ${index * 0.1}s">
-                        <div class="activity-content flex-grow-1 mr-3">
-                            <div class="d-flex align-items-center mb-1">
-                                <span class="badge badge-soft-${activityClass} mr-2" style="font-size: 0.65rem; border-radius: 4px; padding: 2px 6px;">${activityText}</span>
-                                <small class="text-muted" style="font-size: 0.7rem;">${timeAgo}</small>
+                    <div class="activity-bubble p-3 mb-2" style="animation: fadeInUpSlight 0.4s ease forwards; animation-delay: ${index * 0.1}s" title="Dibuat oleh: ${creator.nama}">
+                        <div class="d-flex align-items-start">
+                            ${avatar}
+                            <div class="min-width-0 flex-grow-1 ml-2">
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="badge badge-soft-${activityClass} mr-2" style="font-size: 0.65rem; border-radius: 4px; padding: 2px 6px;">${activityText}</span>
+                                    <small class="text-muted text-nowrap" style="font-size: 0.68rem;">${timeAgo}</small>
+                                </div>
+                                <div class="text-dark font-weight-bold small text-truncate">${task.tugas}</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.68rem;">oleh ${creator.nama}</div>
                             </div>
-                            <div class="text-dark font-weight-bold small text-truncate" style="max-width: 160px;">${task.tugas}</div>
-                        </div>
-                        <div class="activity-creator d-flex align-items-center" title="Dibuat oleh: ${creator.nama}">
-                            <div class="text-right mr-2 d-none d-sm-block">
-                                <div class="small text-dark font-weight-bold" style="font-size: 0.75rem; line-height: 1;">${creator.nama.split(' ')[0]}</div>
-                                <div class="text-muted" style="font-size: 0.6rem;">Pemberi</div>
-                            </div>
-                            <img src="${avatarUrl}" class="rounded-circle border border-white shadow-sm" style="width: 32px; height: 32px; object-fit: cover;" alt="${creator.nama}">
                         </div>
                     </div>
                 `;
