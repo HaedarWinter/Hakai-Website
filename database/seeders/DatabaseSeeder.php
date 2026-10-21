@@ -3,44 +3,75 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Seed the application's database for presentation.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Super Admin Account
         User::create([
-            'nama'  => 'Haev',
-            'email' => 'haev@gmail.com',
+            'nama' => 'Super Admin',
+            'email' => 'superadmin@hakai.com',
             'jabatan' => 'Admin',
-            'password' => Hash::make('admin1234'),
+            'is_super_admin' => true,
+            'password' => Hash::make('superadmin123'),
         ]);
 
         User::create([
-            'nama'  => 'Navira',
-            'email' => 'piaimut@gmail.com',
+            'nama' => 'Anditacantik',
+            'email' => 'andita@hakai.com',
+            'jabatan' => 'Admin',
+            'is_super_admin' => true,
+            'password' => Hash::make('anditacantik123'),
+        ]);
+
+        // Admin Account
+        User::create([
+            'nama' => 'Admin Hakai',
+            'email' => 'admin@hakai.com',
+            'jabatan' => 'Admin',
+            'password' => Hash::make('admin123'),
+        ]);
+
+        // Karyawan Accounts - Professional dummy data
+        User::create([
+            'nama' => 'Budi Santoso',
+            'email' => 'budi.santoso@hakai.com',
             'jabatan' => 'Karyawan',
-            'password' => Hash::make('admin1234'),
+            'password' => Hash::make('karyawan123'),
         ]);
 
         User::create([
-            'nama'  => 'Andita',
-            'email' => 'Anditaimut@gmail.com',
+            'nama' => 'Siti Nurhaliza',
+            'email' => 'siti.nurhaliza@hakai.com',
             'jabatan' => 'Karyawan',
-            'password' => Hash::make('admin1234'),
+            'password' => Hash::make('karyawan123'),
         ]);
 
         User::create([
-            'nama'  => 'Jojo',
-            'email' => 'jojo@gmail.com',
+            'nama' => 'Ahmad Fauzi',
+            'email' => 'ahmad.fauzi@hakai.com',
             'jabatan' => 'Karyawan',
-            'password' => Hash::make('adminindo'),
-         ]);
+            'password' => Hash::make('karyawan123'),
+        ]);
+
+        User::create([
+            'nama' => 'Dewi Lestari',
+            'email' => 'dewi.lestari@hakai.com',
+            'jabatan' => 'Karyawan',
+            'password' => Hash::make('karyawan123'),
+        ]);
+
+        User::create([
+            'nama' => 'Rizki Pratama',
+            'email' => 'rizki.pratama@hakai.com',
+            'jabatan' => 'Karyawan',
+            'password' => Hash::make('karyawan123'),
+        ]);
     }
 }

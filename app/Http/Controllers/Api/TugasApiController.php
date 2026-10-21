@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ActivityLog;
 use App\Models\Tugas;
 use App\Models\User;
 use App\Services\StatisticsService;
+use App\Services\TugasService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TugasExport;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -19,10 +18,12 @@ class TugasApiController extends Controller
     use AuthorizesRequests;
 
     protected $statsService;
+    protected $tugasService;
 
-    public function __construct(StatisticsService $statsService)
+    public function __construct(StatisticsService $statsService, TugasService $tugasService)
     {
         $this->statsService = $statsService;
+        $this->tugasService = $tugasService;
     }
 
     /**
@@ -31,13 +32,16 @@ class TugasApiController extends Controller
     public function index()
     {
         /** @var \App\Models\User $user */
-        $user = auth('sanctum')->user();
+        $user = auth()->user();
+
+        // Refresh user from database to ensure we have the latest data
+        $user->refresh();
 
         // Only get non-deleted records
-        $query = Tugas::with('user:id,nama,email,jabatan')->whereNull('deleted_at');
+        $query = Tugas::with(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path'])->whereNull('deleted_at');
 
         if ($user->isAdmin()) {
-            $tugas = $query->whereHas('user', fn($q) => $q->where('jabatan', 'Karyawan'))
+            $tugas = $query->where('created_by', $user->id)
                 ->latest()
                 ->get();
         } else {
@@ -59,11 +63,11 @@ class TugasApiController extends Controller
     {
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'tugas' => 'required|string|max:255',
+            'tugas' => 'required|string|max:65535',
             'tanggal_mulai' => 'required|date_format:Y-m-d\TH:i',
             'tanggal_selesai' => 'required|date_format:Y-m-d\TH:i|after_or_equal:tanggal_mulai',
             'priority' => 'nullable|in:low,medium,high',
-            'file' => 'nullable|file|mimes:pdf,doc,docx,jpg,png|max:2048',
+            'file' => 'nullable|file|max:51200', // 50MB - all formats supported
         ]);
 
         $user = User::findOrFail($validated['user_id']);
@@ -75,27 +79,10 @@ class TugasApiController extends Controller
             ], 403);
         }
 
-        // Convert datetime-local format to MySQL datetime format
-        $tanggal_mulai = str_replace('T', ' ', $validated['tanggal_mulai']) . ':00';
-        $tanggal_selesai = str_replace('T', ' ', $validated['tanggal_selesai']) . ':00';
-
-        $tugas = Tugas::create([
-            'user_id' => $validated['user_id'],
-            'tugas' => $validated['tugas'],
-            'tanggal_mulai' => $tanggal_mulai,
-            'tanggal_selesai' => $tanggal_selesai,
-            'status' => 'pending',
-            'priority' => $validated['priority'] ?? 'medium',
-        ]);
-
-        if ($request->hasFile('file')) {
-            $path = $request->file('file')->store('tugas_files', 'public');
-            $tugas->tugas_file = $path;
-            $tugas->save();
-        }
+        $tugas = $this->tugasService->createTugas($request->all());
 
         // Load user relationship for response
-        $tugas->load('user:id,nama,email,jabatan');
+        $tugas->load(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path']);
 
         return response()->json([
             'success' => true,
@@ -111,7 +98,7 @@ class TugasApiController extends Controller
     {
         $this->authorize('view', $tugas);
 
-        $tugas->load('user:id,nama,email,jabatan');
+        $tugas->load(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path']);
 
         return response()->json([
             'success' => true,
@@ -127,32 +114,16 @@ class TugasApiController extends Controller
         $this->authorize('update', $tugas);
 
         $validated = $request->validate([
-            'tugas' => 'sometimes|required|string|max:255',
+            'tugas' => 'sometimes|required|string|max:65535',
             'tanggal_mulai' => 'sometimes|required|date_format:Y-m-d\TH:i',
             'tanggal_selesai' => 'sometimes|required|date_format:Y-m-d\TH:i|after_or_equal:tanggal_mulai',
             'priority' => 'nullable|in:low,medium,high',
         ]);
 
-        $oldData = $tugas->getOriginal();
-
-        // Convert datetime-local format to MySQL datetime format if provided
-        if (isset($validated['tanggal_mulai'])) {
-            $validated['tanggal_mulai'] = str_replace('T', ' ', $validated['tanggal_mulai']) . ':00';
-        }
-        if (isset($validated['tanggal_selesai'])) {
-            $validated['tanggal_selesai'] = str_replace('T', ' ', $validated['tanggal_selesai']) . ':00';
-        }
-
-        $tugas->update($validated);
+        $tugas = $this->tugasService->updateTugas($tugas, $validated);
 
         // Load user relationship for response
-        $tugas->load('user:id,nama,email,jabatan');
-
-        // Log activity
-        ActivityLog::log('updated', $tugas, 'Memperbarui tugas', [
-            'old' => $oldData,
-            'new' => $tugas->getAttributes(),
-        ]);
+        $tugas->load(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path']);
 
         return response()->json([
             'success' => true,
@@ -168,22 +139,7 @@ class TugasApiController extends Controller
     {
         $this->authorize('delete', $tugas);
 
-        // Delete files if they exist
-        if ($tugas->tugas_file) {
-            Storage::disk('public')->delete($tugas->tugas_file);
-        }
-
-        if ($tugas->karyawan_file) {
-            Storage::disk('public')->delete($tugas->karyawan_file);
-        }
-
-        // Log activity before deletion
-        ActivityLog::log('deleted', $tugas, 'Menghapus tugas: ' . $tugas->tugas, [
-            'tugas_data' => $tugas->toArray(),
-        ]);
-
-        // Force delete (permanent) instead of soft delete
-        $tugas->forceDelete();
+        $this->tugasService->deleteTugas($tugas);
 
         return response()->json([
             'success' => true,
@@ -198,11 +154,7 @@ class TugasApiController extends Controller
     {
         $this->authorize('approve', $tugas);
 
-        $tugas->status = 'approved';
-        $tugas->save();
-
-        // Log activity
-        ActivityLog::log('approved', $tugas, 'Menyetujui tugas dari ' . $tugas->user->nama);
+        $this->tugasService->approveTugas($tugas);
 
         return response()->json([
             'success' => true,
@@ -218,18 +170,10 @@ class TugasApiController extends Controller
         $this->authorize('reject', $tugas);
 
         $validated = $request->validate([
-            'catatan' => 'required|string|max:255',
+            'catatan' => 'required|string|max:65535',
         ]);
 
-        $tugas->status = 'rejected';
-        $tugas->catatan = $validated['catatan'];
-        $tugas->save();
-
-        // Log activity
-        $tugas->load('user');
-        ActivityLog::log('rejected', $tugas, 'Menolak tugas dari ' . $tugas->user->nama, [
-            'catatan' => $validated['catatan'],
-        ]);
+        $tugas = $this->tugasService->rejectTugas($tugas, $validated['catatan']);
 
         return response()->json([
             'success' => true,
@@ -246,17 +190,10 @@ class TugasApiController extends Controller
         $this->authorize('upload', $tugas);
 
         $validated = $request->validate([
-            'file' => 'required|mimes:pdf,doc,docx,jpg,png|max:2048',
+            'file' => 'required|file|max:51200', // 50MB - all formats supported
         ]);
 
-        $path = $request->file('file')->store('tugas_karyawan', 'public');
-        $tugas->karyawan_file = $path;
-
-        if ($tugas->status === 'pending') {
-            $tugas->status = 'submitted';
-        }
-
-        $tugas->save();
+        $tugas = $this->tugasService->uploadResult($tugas, $request->file('file'));
 
         return response()->json([
             'success' => true,
@@ -279,12 +216,100 @@ class TugasApiController extends Controller
     }
 
     /**
+     * Get list of trashed tasks.
+     */
+    public function trash()
+    {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+        $user->refresh();
+
+        $query = Tugas::onlyTrashed()
+            ->with(['user:id,nama,email,jabatan,profile_photo_path', 'creator:id,nama,email,jabatan,profile_photo_path']);
+
+        if ($user->isAdmin()) {
+            $tugas = $query->where('created_by', $user->id)
+                ->latest('deleted_at')
+                ->get();
+        } else {
+            $tugas = $query->where('user_id', $user->id)
+                ->latest('deleted_at')
+                ->get();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $tugas,
+        ]);
+    }
+
+    /**
+     * Restore a trashed task.
+     */
+    public function restore($id)
+    {
+        $tugas = Tugas::onlyTrashed()->findOrFail($id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        // Check permissions: Admin can only restore their own tasks, Karyawan can only restore their own
+        if ($user->isAdmin()) {
+            if ($tugas->created_by !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki izin untuk mengembalikan tugas ini',
+                ], 403);
+            }
+        } elseif ($tugas->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk mengembalikan tugas ini',
+            ], 403);
+        }
+
+        $this->tugasService->restoreTugas($tugas);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tugas berhasil dikembalikan',
+        ]);
+    }
+
+    /**
+     * Permanently delete a task (Admin only).
+     */
+    public function forceDelete($id)
+    {
+        $tugas = Tugas::onlyTrashed()->findOrFail($id);
+
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        // Only the Admin who created the task can permanently delete
+        if (!$user->isAdmin() || $tugas->created_by !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki izin untuk menghapus permanen tugas ini',
+            ], 403);
+        }
+
+        $this->tugasService->forceDeleteTugas($tugas);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tugas berhasil dihapus permanen',
+        ]);
+    }
+
+    /**
      * Export tasks to Excel.
      */
     public function excel()
     {
+        $user = auth()->user();
         $filename = now()->format('Ymd_His');
-        return Excel::download(new TugasExport, "DataTugas_{$filename}.xlsx");
+        return Excel::download(new TugasExport($user), "DataTugas_{$filename}.xlsx");
     }
 
     /**
@@ -294,12 +319,13 @@ class TugasApiController extends Controller
     {
         try {
             /** @var \App\Models\User $user */
-            $user = auth('sanctum')->user();
+            $user = auth()->user();
 
             if ($user->isAdmin()) {
                 // Admin PDF
                 $tugas = Tugas::with('user')
                     ->whereNull('deleted_at')
+                    ->where('created_by', $user->id)
                     ->orderBy('created_at', 'desc')
                     ->get();
                 $stats = $this->statsService->calculateTaskStats($tugas);

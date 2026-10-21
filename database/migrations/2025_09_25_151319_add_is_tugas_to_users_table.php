@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_tugas')->default(false)->after('password');
+            if (!Schema::hasColumn('users', 'is_tugas')) {
+                $table->boolean('is_tugas')->default(false)->after('password');
+            }
         });
     }
 

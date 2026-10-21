@@ -4,55 +4,101 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\TugasApiController;
+use App\Http\Controllers\Api\SettingsApiController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Api\TrashApiController;
+use App\Http\Controllers\Api\AuditLogApiController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| API Routes (Business Logic)
 |--------------------------------------------------------------------------
 |
-| Here is where you register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
+| These routes handle all business logic and data operations.
+| All routes return JSON responses and are prefixed with /api.
 |
 */
 
 // Public API routes
 Route::post('/login', [AuthApiController::class, 'login']);
 
+Route::middleware(['auth:sanctum,web'])->group(function () {
+    Route::get('/global-search', [App\Http\Controllers\Api\GlobalSearchController::class, 'search']);
+});
+
 // Protected API routes (require authentication)
-Route::middleware('auth:sanctum')->group(function () {
-    // Auth routes
+// Uses both web and sanctum guards for maximum compatibility
+Route::middleware(['auth:sanctum,web'])->group(function () {
+
+    // ==================== Auth ====================
     Route::post('/logout', [AuthApiController::class, 'logout']);
 
-    // User API routes
-    Route::apiResource('users', UserApiController::class);
-    Route::get('/users/excel', [UserApiController::class, 'excel'])->name('users.excel');
-    Route::get('/users/pdf', [UserApiController::class, 'pdf'])->name('users.pdf');
+    // ==================== Dashboard ====================
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/stats', [DashboardController::class, 'stats']);
+        Route::get('/recent-tasks', [DashboardController::class, 'recentTasks']);
+        Route::get('/trend', [DashboardController::class, 'trend']);
+        Route::get('/summary', [DashboardController::class, 'summary']);
+    });
 
-    // Task API routes
+    // ==================== Settings ====================
+    Route::prefix('settings')->group(function () {
+        Route::post('/profile', [SettingsApiController::class, 'updateProfile']);
+        Route::post('/photo', [SettingsApiController::class, 'updatePhoto']);
+        Route::put('/password', [SettingsApiController::class, 'updatePassword']);
+    });
+
+    // ==================== User Management (Admin Only) ====================
+    Route::middleware(['admin'])->group(function () {
+        Route::post('/users/{user}/toggle-super-admin', [UserApiController::class, 'toggleSuperAdmin'])->name('users.toggleSuperAdmin');
+        Route::post('/users/{user}/generate-reset-token', [UserApiController::class, 'generateResetToken'])->name('users.generateResetToken');
+        Route::apiResource('users', UserApiController::class);
+    });
+
+    // ==================== Trash & Audit Log ====================
+    Route::middleware(['admin'])->group(function () {
+        Route::get('/trash', [TrashApiController::class, 'index']);
+        Route::post('/trash/{id}/restore', [TrashApiController::class, 'restore']);
+        Route::delete('/trash/{id}', [TrashApiController::class, 'forceDelete']);
+        Route::get('/audit-logs', [AuditLogApiController::class, 'index']);
+    });
+
+    // ==================== Task Management ====================
     Route::prefix('tugas')->group(function () {
-        // Route tanpa parameter
+        // List and create
         Route::get('/', [TugasApiController::class, 'index']);
         Route::post('/', [TugasApiController::class, 'store']);
 
-        //
-        // PERHATIAN: Route dengan path spesifik HARUS DIDEFINISIKAN SEBELUM route parameter {tugas}
-        // untuk menghindari kesalahan pencocokan seperti /tugas/karyawan yang tertangkap oleh /{tugas}.
-        //
+        // Special routes (must be before parameter routes)
         Route::get('/karyawan', [TugasApiController::class, 'karyawanList']);
-        Route::get('/excel', [TugasApiController::class, 'excel'])->name('tugas.excel');
-        Route::get('/pdf', [TugasApiController::class, 'pdf'])->name('tugas.pdf');
 
-        // Route dengan parameter (route model binding akan otomatis resolve Tugas model)
+        // Trash operations (must be before parameter routes)
+        Route::get('/trash/list', [TugasApiController::class, 'trash']);
+
+        // Comments delete (must be before parameter routes)
+        Route::delete('/comments/{comment}', [\App\Http\Controllers\Api\TaskCommentController::class, 'destroy']);
+
+        // Parameter routes (route model binding)
         Route::get('/{tugas}', [TugasApiController::class, 'show']);
         Route::put('/{tugas}', [TugasApiController::class, 'update']);
         Route::delete('/{tugas}', [TugasApiController::class, 'destroy']);
         Route::post('/{tugas}/upload', [TugasApiController::class, 'upload']);
         Route::post('/{tugas}/approve', [TugasApiController::class, 'approve']);
         Route::post('/{tugas}/reject', [TugasApiController::class, 'reject']);
+
+        // Comments (with parameter)
+        Route::get('/{tugas}/comments', [\App\Http\Controllers\Api\TaskCommentController::class, 'index']);
+        Route::post('/{tugas}/comments', [\App\Http\Controllers\Api\TaskCommentController::class, 'store']);
+
+        // Trash restore/force delete (with parameter)
+        Route::post('/{id}/restore', [TugasApiController::class, 'restore']);
+        Route::delete('/{id}/force', [TugasApiController::class, 'forceDelete']);
     });
 
-    // Dashboard API routes
-    Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'stats']);
-    Route::get('/dashboard/recent-tasks', [\App\Http\Controllers\DashboardController::class, 'recentTasks']);
+    // ==================== Notifications ====================
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/mark-read', [NotificationController::class, 'markNotificationsRead']);
+    Route::get('/messages', [NotificationController::class, 'messages']);
+    Route::post('/messages/mark-read', [NotificationController::class, 'markMessagesRead']);
 });

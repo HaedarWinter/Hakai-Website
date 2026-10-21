@@ -1,0 +1,127 @@
+{
+    "emptyTable": "Tidak ada data yang tersedia pada tabel ini",
+    "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+    "infoEmpty": "Menampilkan 0 sampai 0 dari 0 entri",
+    "infoFiltered": "(disaring dari _MAX_ entri keseluruhan)",
+    "infoPostFix": "",
+    "thousands": ".",
+    "lengthMenu": "Tampilkan _MENU_ entri",
+    "loadingRecords": "Sedang memuat...",
+    "processing": "Sedang memproses...",
+    "search": "Cari:",
+    "zeroRecords": "Tidak ditemukan data yang sesuai",
+    "paginate": {
+        "first": "Pertama",
+        "last": "Terakhir",
+        "next": "Selanjutnya",
+        "previous": "Sebelumnya"
+    },
+    "aria": {
+        "sortAscending": ": aktifkan untuk mengurutkan kolom asending",
+        "sortDescending": ": aktifkan untuk mengurutkan kolom desending"
+    },
+    "autoFill": {
+        "cancel": "Batal",
+        "fill": "Isi semua sel dengan <i>%d<\/i>",
+        "fillHorizontal": "Isi sel secara horizontal",
+        "fillVertical": "Isi sel secara vertikal"
+    },
+    "buttons": {
+        "collection": "Kumpulan <span class='ui-button-icon-primary ui-icon ui-icon-triangle-1-s'/><\/span>",
+        "colvis": "Visibilitas Kolom",
+        "colvisRestore": "Pulihkan visibilitas",
+        "copy": "Salin",
+        "copyKeys": "Tekan ctrl atau u2318 + C untuk menyalin tabel ke papan klip sistem Anda.<br \/><br \/>Untuk membatalkan, klik pesan ini atau tekan esc.",
+        "copySuccess": {
+            "1": "1 baris disalin ke papan klip",
+            "_": "%d baris disalin ke papan klip"
+        },
+        "copyTitle": "Salin ke Papan klip",
+        "csv": "CSV",
+        "excel": "Excel",
+        "pageLength": {
+            "-1": "Tampilkan semua baris",
+            "1": "Tampilkan 1 baris",
+            "_": "Tampilkan %d baris"
+        },
+        "pdf": "PDF",
+        "print": "Cetak"
+    },
+    "searchBuilder": {
+        "add": "Tambah Kondisi",
+        "button": {
+            "0": "Pencari Kondisi",
+            "_": "Pencari Kondisi (%d)"
+        },
+        "clearAll": "Bersihkan Semua",
+        "condition": "Kondisi",
+        "data": "Data",
+        "deleteTitle": "Hapus filter",
+        "leftTitle": "Ke Kiri",
+        "logicAnd": "Dan",
+        "logicOr": "Atau",
+        "rightTitle": "Ke Kanan",
+        "title": {
+            "0": "Pencari Kondisi",
+            "_": "Pencari Kondisi (%d)"
+        },
+        "value": "Nilai"
+    },
+    "searchPanes": {
+        "clearAll": "Bersihkan Semua",
+        "collapse": {
+            "0": "SearchPanes",
+            "_": "SearchPanes (%d)"
+        },
+        "count": "{total}",
+        "countFiltered": "{shown} ({total})",
+        "emptyPanes": "Tidak Ada SearchPanes",
+        "loadMessage": "Memuat SearchPanes",
+        "title": "Filter Aktif - %d"
+    },
+    "select": {
+        "cells": {
+            "1": "1 sel terpilih",
+            "_": "%d sel terpilih"
+        },
+        "columns": {
+            "1": "1 kolom terpilih",
+            "_": "%d kolom terpilih"
+        },
+        "rows": {
+            "1": "1 baris terpilih",
+            "_": "%d baris terpilih"
+        }
+    },
+    "editor": {
+        "close": "Tutup",
+        "create": {
+            "button": "Baru",
+            "submit": "Tambah",
+            "title": "Tambah entri baru"
+        },
+        "edit": {
+            "button": "Edit",
+            "submit": "Perbarui",
+            "title": "Edit entri"
+        },
+        "remove": {
+            "button": "Hapus",
+            "submit": "Hapus",
+            "title": "Hapus",
+            "confirm": {
+                "_": "Apakah Anda yakin ingin menghapus %d baris?",
+                "1": "Apakah Anda yakin ingin menghapus 1 baris?"
+            }
+        },
+        "multi": {
+            "info": "Item yang dipilih berisi nilai yang berbeda untuk input ini. Untuk mengedit dan mengatur semua item untuk input ini ke nilai yang sama, klik atau tekan di sini, jika tidak maka akan mempertahankan nilai masing-masing.",
+            "noMulti": "Input ini dapat diedit secara individual, tetapi bukan bagian dari grup.",
+            "restore": "Batalkan Perubahan",
+            "title": "Beberapa Nilai"
+        },
+        "error": {
+            "system": "Terjadi kesalahan sistem (<a target=\"\\\" rel=\"nofollow\" href=\"\\\">Informasi selebihnya<\/a>)."
+        }
+    }
+}

@@ -31,6 +31,10 @@ class AuthApiController extends Controller
         // Hapus token lama untuk mencegah penumpukan
         $user->tokens()->delete();
 
+        // Update last_seen on login
+        $user->last_seen = now();
+        $user->save();
+
         // Create token
         $token = $user->createToken('auth_token')->plainTextToken;
 

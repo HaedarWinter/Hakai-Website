@@ -20,25 +20,44 @@ class UserExport implements FromView, ShouldAutoSize, WithEvents, WithProperties
 {
     private $users;
     private $stats;
-    private $statsService;
 
     public function __construct()
     {
-        $this->statsService = app(StatisticsService::class);
-        $this->users = User::orderBy('jabatan', 'ASC')->get();
-        $this->stats = $this->statsService->calculateUserStats($this->users);
+        // Get users with their task stats
+        $this->users = User::withCount([
+            'tugas as total_tugas',
+            'tugas as tugas_selesai' => function ($query) {
+                $query->where('status', 'approved');
+            },
+            'tugas as tugas_pending' => function ($query) {
+                $query->where('status', 'pending');
+            },
+            'tugas as tugas_submitted' => function ($query) {
+                $query->where('status', 'submitted');
+            },
+            'tugas as tugas_rejected' => function ($query) {
+                $query->where('status', 'rejected');
+            }
+        ])
+            ->whereNull('deleted_at')
+            ->orderByDesc('jabatan') // Admin first
+            ->orderBy('nama')
+            ->get();
+
+        // Calculate stats
+        $statsService = app(StatisticsService::class);
+        $this->stats = $statsService->calculateUserStats($this->users);
     }
 
     public function view(): View
     {
-        $data = [
-            'user' => $this->users,
+        return view('admin.user.excel', [
+            'user' => $this->users, // View Use 'user' variable name
             'stats' => $this->stats,
             'tanggal' => now()->format('d F Y'),
             'jam' => now()->format('H:i:s'),
             'bulan_tahun' => now()->format('F Y'),
-        ];
-        return view('admin/user/excel', $data);
+        ]);
     }
 
     public function title(): string
@@ -64,7 +83,7 @@ class UserExport implements FromView, ShouldAutoSize, WithEvents, WithProperties
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function(AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
                 $lastRow = $sheet->getHighestRow();
 

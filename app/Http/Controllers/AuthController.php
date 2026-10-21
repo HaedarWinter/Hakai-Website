@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Http\Middleware\LoginThrottle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -23,27 +25,48 @@ class AuthController extends Controller
     public function loginProses(Request $request)
     {
         // Validasi input
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $request->validate([
+            'login' => ['required', 'string'],
             'password' => ['required', 'string', 'min:8', 'max:16'],
         ], [
-            'email.required' => 'Email Tidak Boleh Kosong',
-            'email.email' => 'Email Tidak Valid',
+            'login.required' => 'Email atau Username Tidak Boleh Kosong',
             'password.required' => 'Kata Sandi Tidak Boleh Kosong',
             'password.min' => 'Kata Sandi Minimal 8 Karakter',
             'password.max' => 'Kata Sandi Maksimal 16 Karakter',
         ]);
 
+        // Determine if login input is email or username
+        $loginType = filter_var($request->login, FILTER_VALIDATE_EMAIL) ? 'email' : 'nama';
+
+        $credentials = [
+            $loginType => $request->login,
+            'password' => $request->password,
+        ];
+
         // Cek kredensial
         if (!Auth::attempt($credentials, $request->filled('remember'))) {
+            // Increment failed login attempts
+            LoginThrottle::hit($request);
+
+            $remaining = LoginThrottle::remainingAttempts($request);
+            $message = 'Email/Username atau Password Salah';
+
+            if ($remaining > 0 && $remaining <= 3) {
+                $message .= ". Sisa percobaan: {$remaining}";
+            }
+
             return back()->withErrors([
-                'email' => 'Email atau Password Salah',
-            ])->onlyInput('email');
+                'login' => $message,
+            ])->onlyInput('login');
         }
+
+        // Clear login attempts on successful login
+        LoginThrottle::clear($request);
 
         // Regenerate session biar aman (hindari session fixation)
         $request->session()->regenerate();
 
+        /** @var User $user */
         $user = Auth::user();
 
         // Hapus token lama biar ga numpuk
@@ -65,8 +88,8 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         // Hapus semua token Sanctum milik user
-        if ($request->user()) {
-            $request->user()->tokens()->delete();
+        if ($user = $request->user()) {
+            $user->tokens()->delete();
         }
 
         // Logout dari Laravel session

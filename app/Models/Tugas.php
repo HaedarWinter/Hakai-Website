@@ -11,8 +11,14 @@ class Tugas extends Model
 {
     use HasFactory, SoftDeletes;
 
+    const STATUS_PENDING = 'pending';
+    const STATUS_SUBMITTED = 'submitted';
+    const STATUS_APPROVED = 'approved';
+    const STATUS_REJECTED = 'rejected';
+
     protected $fillable = [
         'user_id',
+        'created_by',
         'tugas',
         'tanggal_mulai',
         'tanggal_selesai',
@@ -38,11 +44,19 @@ class Tugas extends Model
     }
 
     /**
+     * Get the admin who created the tugas.
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
      * Scope a query to only include pending tasks.
      */
     public function scopePending($query)
     {
-        return $query->where('status', 'pending');
+        return $query->where('status', self::STATUS_PENDING);
     }
 
     /**
@@ -50,7 +64,7 @@ class Tugas extends Model
      */
     public function scopeApproved($query)
     {
-        return $query->where('status', 'approved');
+        return $query->where('status', self::STATUS_APPROVED);
     }
 
     /**
@@ -58,7 +72,7 @@ class Tugas extends Model
      */
     public function scopeRejected($query)
     {
-        return $query->where('status', 'rejected');
+        return $query->where('status', self::STATUS_REJECTED);
     }
 
     /**
@@ -66,7 +80,15 @@ class Tugas extends Model
      */
     public function scopeSubmitted($query)
     {
-        return $query->where('status', 'submitted');
+        return $query->where('status', self::STATUS_SUBMITTED);
+    }
+
+    /**
+     * Scope to filter tasks by creator (admin ownership).
+     */
+    public function scopeForAdmin($query, User $admin)
+    {
+        return $query->where('created_by', $admin->id);
     }
 
     /**
@@ -74,6 +96,6 @@ class Tugas extends Model
      */
     public function isOverdue(): bool
     {
-        return $this->tanggal_selesai < now() && $this->status !== 'approved';
+        return $this->tanggal_selesai < now() && $this->status !== self::STATUS_APPROVED;
     }
 }

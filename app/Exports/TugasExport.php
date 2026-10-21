@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Tugas;
+use App\Models\User;
 use App\Services\StatisticsService;
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
@@ -22,37 +23,52 @@ class TugasExport implements FromView, ShouldAutoSize, WithEvents, WithPropertie
     private $stats;
     private $statsService;
 
-    public function __construct()
+    public function __construct(?User $user = null)
     {
         $this->statsService = app(StatisticsService::class);
-        $this->tugas = Tugas::with('user')->whereNull('deleted_at')->orderBy('created_at', 'DESC')->get();
+
+        $query = Tugas::with('user')->whereNull('deleted_at')->orderBy('created_at', 'DESC');
+
+        if ($user) {
+            if ($user->isAdmin()) {
+                $query->where('created_by', $user->id);
+            } else {
+                $query->where('user_id', $user->id);
+            }
+        }
+
+        $this->tugas = $query->get();
         $this->stats = $this->statsService->calculateTaskStats($this->tugas);
-        
+
         // Add additional stats for export
         $totalUserBertugas = $this->tugas->pluck('user.id')->unique()->count();
         $this->stats['total_user_bertugas'] = $totalUserBertugas;
-        
+
         // Legacy stats mapping for backward compatibility with views
         $today = now();
-        $tugasSelesai = $this->tugas->filter(fn($item) => 
+        $tugasSelesai = $this->tugas->filter(
+            fn($item) =>
             $item->tanggal_selesai && $today->gte($item->tanggal_selesai)
         )->count();
-        
-        $tugasSedangBerjalan = $this->tugas->filter(fn($item) => 
+
+        $tugasSedangBerjalan = $this->tugas->filter(
+            fn($item) =>
             $item->tanggal_mulai && $today->gte($item->tanggal_mulai) &&
             (!$item->tanggal_selesai || $today->lt($item->tanggal_selesai))
         )->count();
-        
-        $tugasBelumMulai = $this->tugas->filter(fn($item) => 
+
+        $tugasBelumMulai = $this->tugas->filter(
+            fn($item) =>
             $item->tanggal_mulai && $today->lt($item->tanggal_mulai)
         )->count();
-        
-        $tugasOverdue = $this->tugas->filter(fn($item) => 
+
+        $tugasOverdue = $this->tugas->filter(
+            fn($item) =>
             $item->tanggal_selesai && $today->gt($item->tanggal_selesai)
         )->count();
-        
+
         $totalTugas = $this->tugas->count();
-        
+
         $this->stats = array_merge($this->stats, [
             'tugas_selesai' => $tugasSelesai,
             'tugas_sedang_berjalan' => $tugasSedangBerjalan,
@@ -102,7 +118,7 @@ class TugasExport implements FromView, ShouldAutoSize, WithEvents, WithPropertie
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function(AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
                 $lastRow = $sheet->getHighestRow();
 
@@ -399,63 +415,68 @@ class TugasExport implements FromView, ShouldAutoSize, WithEvents, WithPropertie
             }
 
             // Conditional coloring berdasarkan status tugas
+            // Conditional coloring berdasarkan status tugas
             $tanggalMulai = $sheet->getCell("D{$row}")->getValue();
             $tanggalSelesai = $sheet->getCell("E{$row}")->getValue();
 
-            if ($tanggalMulai && $tanggalSelesai) {
-                $mulai = \Carbon\Carbon::parse($tanggalMulai);
-                $selesai = \Carbon\Carbon::parse($tanggalSelesai);
+            if ($tanggalMulai && $tanggalSelesai && $tanggalMulai !== 'N/A' && $tanggalSelesai !== 'N/A') {
+                try {
+                    $mulai = \Carbon\Carbon::createFromFormat('d/m/Y', $tanggalMulai);
+                    $selesai = \Carbon\Carbon::createFromFormat('d/m/Y', $tanggalSelesai);
 
-                if ($today->gte($selesai)) {
-                    // Tugas Selesai - Hijau
-                    $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
-                        'borders' => [
-                            'left' => [
-                                'borderStyle' => Border::BORDER_THICK,
-                                'color' => ['rgb' => '4CAF50'],
+                    if ($today->gte($selesai)) {
+                        // Tugas Selesai - Hijau
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'borders' => [
+                                'left' => [
+                                    'borderStyle' => Border::BORDER_THICK,
+                                    'color' => ['rgb' => '4CAF50'],
+                                ],
                             ],
-                        ],
-                    ]);
-                    $sheet->getStyle("F{$row}")->applyFromArray([
-                        'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'C8E6C9']],
-                        'font' => ['bold' => true, 'color' => ['rgb' => '2E7D32']],
-                    ]);
-                } elseif ($today->gte($mulai) && $today->lt($selesai)) {
-                    // Sedang Berjalan - Orange
-                    $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
-                        'borders' => [
-                            'left' => [
-                                'borderStyle' => Border::BORDER_THICK,
-                                'color' => ['rgb' => 'FF9800'],
+                        ]);
+                        $sheet->getStyle("F{$row}")->applyFromArray([
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'C8E6C9']],
+                            'font' => ['bold' => true, 'color' => ['rgb' => '2E7D32']],
+                        ]);
+                    } elseif ($today->gte($mulai) && $today->lt($selesai)) {
+                        // Sedang Berjalan - Orange
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'borders' => [
+                                'left' => [
+                                    'borderStyle' => Border::BORDER_THICK,
+                                    'color' => ['rgb' => 'FF9800'],
+                                ],
                             ],
-                        ],
-                    ]);
-                    $sheet->getStyle("F{$row}")->applyFromArray([
-                        'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FFF3E0']],
-                        'font' => ['bold' => true, 'color' => ['rgb' => 'E65100']],
-                    ]);
-                } elseif ($today->lt($mulai)) {
-                    // Belum Mulai - Biru
-                    $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
-                        'borders' => [
-                            'left' => [
-                                'borderStyle' => Border::BORDER_THICK,
-                                'color' => ['rgb' => '2196F3'],
+                        ]);
+                        $sheet->getStyle("F{$row}")->applyFromArray([
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FFF3E0']],
+                            'font' => ['bold' => true, 'color' => ['rgb' => 'E65100']],
+                        ]);
+                    } elseif ($today->lt($mulai)) {
+                        // Belum Mulai - Biru
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'borders' => [
+                                'left' => [
+                                    'borderStyle' => Border::BORDER_THICK,
+                                    'color' => ['rgb' => '2196F3'],
+                                ],
                             ],
-                        ],
-                    ]);
-                    $sheet->getStyle("F{$row}")->applyFromArray([
-                        'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E3F2FD']],
-                        'font' => ['bold' => true, 'color' => ['rgb' => '0D47A1']],
-                    ]);
-                }
+                        ]);
+                        $sheet->getStyle("F{$row}")->applyFromArray([
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E3F2FD']],
+                            'font' => ['bold' => true, 'color' => ['rgb' => '0D47A1']],
+                        ]);
+                    }
 
-                // Check overdue
-                if ($today->gt($selesai)) {
-                    $sheet->getStyle("G{$row}")->applyFromArray([
-                        'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FFCDD2']],
-                        'font' => ['bold' => true, 'color' => ['rgb' => 'C62828']],
-                    ]);
+                    // Check overdue
+                    if ($today->gt($selesai)) {
+                        $sheet->getStyle("G{$row}")->applyFromArray([
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FFCDD2']],
+                            'font' => ['bold' => true, 'color' => ['rgb' => 'C62828']],
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Ignore parsing errors
                 }
             }
         }

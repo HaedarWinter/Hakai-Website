@@ -22,9 +22,16 @@ class EnsureUserIsAdmin
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        
+
         if ($user->isAdmin()) {
             return $next($request);
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Anda tidak memiliki izin untuk melakukan aksi ini.'
+            ], 403);
         }
 
         return redirect()->route('dashboard')->with('error', 'Anda tidak memiliki akses');

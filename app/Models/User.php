@@ -19,6 +19,15 @@ class User extends Authenticatable
         'jabatan',
         'password',
         'is_tugas',
+        'is_super_admin',
+        'profile_photo_path',
+        'last_seen',
+        'no_hp',
+        'alamat',
+        'bio',
+        'tanggal_bergabung',
+        'notifications_read_at',
+        'messages_read_at',
     ];
 
     protected $hidden = [
@@ -29,7 +38,10 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_tugas' => 'boolean',
+        'is_super_admin' => 'boolean',
         'deleted_at' => 'datetime',
+        'notifications_read_at' => 'datetime',
+        'messages_read_at' => 'datetime',
     ];
 
     /**
@@ -45,7 +57,23 @@ class User extends Authenticatable
      */
     public function scopeAdmins($query)
     {
-        return $query->where('jabatan', 'Admin');
+        return $query->where(\Illuminate\Support\Facades\DB::raw('LOWER(jabatan)'), 'admin');
+    }
+
+    /**
+     * Check if the user is an admin.
+     */
+    public function isAdmin(): bool
+    {
+        return strtolower($this->jabatan) === 'admin' || $this->isSuperAdmin();
+    }
+
+    /**
+     * Check if the user is a Super Admin (Owner).
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->is_super_admin === true;
     }
 
     /**
@@ -53,7 +81,7 @@ class User extends Authenticatable
      */
     public function scopeEmployees($query)
     {
-        return $query->where('jabatan', 'Karyawan');
+        return $query->where(\Illuminate\Support\Facades\DB::raw('LOWER(jabatan)'), 'karyawan');
     }
 
     /**
@@ -65,18 +93,20 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user is an admin.
-     */
-    public function isAdmin(): bool
-    {
-        return $this->jabatan === 'Admin';
-    }
-
-    /**
      * Check if user is an employee.
      */
     public function isEmployee(): bool
     {
-        return $this->jabatan === 'Karyawan';
+        return strtolower($this->jabatan) === 'karyawan';
+    }
+
+    /**
+     * Get the profile photo URL attribute.
+     */
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path
+            ? asset('storage/' . $this->profile_photo_path)
+            : null;
     }
 }

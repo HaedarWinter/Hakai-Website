@@ -20,8 +20,11 @@ class TugasPolicy
      */
     public function view(User $user, Tugas $tugas): bool
     {
-        // Admin can view all tasks, employees can only view their own
-        return $user->isAdmin() || $tugas->user_id === $user->id;
+        // Admin can only view tasks they created, employees can only view their assigned tasks
+        if ($user->isAdmin()) {
+            return $tugas->created_by === $user->id;
+        }
+        return $tugas->user_id === $user->id;
     }
 
     /**
@@ -37,15 +40,20 @@ class TugasPolicy
      */
     public function update(User $user, Tugas $tugas): bool
     {
-        return $user->isAdmin();
+        // Only the admin who created the task can update it
+        return $user->isAdmin() && $tugas->created_by === $user->id;
     }
 
     /**
      * Determine if the user can delete the task.
+     * Admin can delete tasks they created, Karyawan can delete their own assigned tasks (move to trash).
      */
     public function delete(User $user, Tugas $tugas): bool
     {
-        return $user->isAdmin();
+        if ($user->isAdmin()) {
+            return $tugas->created_by === $user->id;
+        }
+        return $tugas->user_id === $user->id;
     }
 
     /**
@@ -62,7 +70,8 @@ class TugasPolicy
      */
     public function approve(User $user, Tugas $tugas): bool
     {
-        return $user->isAdmin();
+        // Only the admin who created the task can approve it
+        return $user->isAdmin() && $tugas->created_by === $user->id;
     }
 
     /**
@@ -70,7 +79,8 @@ class TugasPolicy
      */
     public function reject(User $user, Tugas $tugas): bool
     {
-        return $user->isAdmin();
+        // Only the admin who created the task can reject it
+        return $user->isAdmin() && $tugas->created_by === $user->id;
     }
 }
 

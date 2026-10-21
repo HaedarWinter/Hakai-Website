@@ -78,45 +78,140 @@ class StatisticsService
     /**
      * Get dashboard statistics based on user role.
      */
-    public function getDashboardStats(?User $user = null): array
+    /**
+     * Get dashboard statistics based on user role and scope.
+     */
+    public function getDashboardStats(?User $user = null, string $scope = 'global'): array
     {
+        // Ensure we have a user
         $user = $user ?? auth()->user();
 
-        // Only count non-deleted records
-        $totalTugas = Tugas::whereNull('deleted_at')->count();
-        $totalUsers = User::count();
-        $totalSelesai = Tugas::whereNull('deleted_at')->where('status', 'approved')->count();
-        $totalPending = Tugas::whereNull('deleted_at')->where('status', 'pending')->count();
+        if (!$user) {
+            return [
+                'total_tugas' => 0,
+                'total_users' => 0,
+                'total_selesai' => 0,
+                'total_pending' => 0,
+                'total_submitted' => 0,
+                'total_rejected' => 0,
+            ];
+        }
+
+        // Refresh user to ensure latest attributes are loaded
+        $user = User::find($user->id);
+
+        // Base query - Admin sees ALL tasks, Employee sees only their own
+        if ($user->isAdmin()) {
+            $query = Tugas::whereNull('deleted_at');
+
+            // If scope is personal, filter by created_by
+            if ($scope === 'personal') {
+                $query->where('created_by', $user->id);
+            }
+
+            $totalUsers = User::count();
+        } else {
+            // Employee: Show only tasks assigned to them
+            $query = Tugas::whereNull('deleted_at')->where('user_id', $user->id);
+            $totalUsers = 0; // Employees don't see user count
+        }
+
+        // Clone query for counts to avoid modifying the base query object reference issues if any
+        $totalTugas = (clone $query)->count();
+        $totalSelesai = (clone $query)->where('status', 'approved')->count();
+        $totalPending = (clone $query)->where('status', 'pending')->count();
+        $totalSubmitted = (clone $query)->where('status', 'submitted')->count();
+        $totalRejected = (clone $query)->where('status', 'rejected')->count();
 
         return [
             'total_tugas' => $totalTugas,
             'total_users' => $totalUsers,
             'total_selesai' => $totalSelesai,
-            'total_pending' => $totalPending
+            'total_pending' => $totalPending,
+            'total_submitted' => $totalSubmitted,
+            'total_rejected' => $totalRejected,
         ];
     }
 
     /**
-     * Get recent tasks based on user role.
+     * Get recent tasks based on user role and scope.
      */
-    public function getRecentTasks(?User $user = null, int $limit = 5): Collection
+    public function getRecentTasks(?User $user = null, int $limit = 5, string $scope = 'global'): Collection
     {
         $user = $user ?? auth()->user();
 
         if ($user->isAdmin()) {
-            return Tugas::with('user')
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc')
+            $query = Tugas::with(['user', 'creator'])->whereNull('deleted_at');
+
+            // If scope is personal, filter by created_by
+            if ($scope === 'personal') {
+                $query->where('created_by', $user->id);
+            }
+
+            return $query->orderBy('created_at', 'desc')
                 ->take($limit)
                 ->get();
         }
 
-        return Tugas::with('user')
+        // Employee: Show only their tasks
+        return Tugas::with(['user', 'creator'])
             ->whereNull('deleted_at')
             ->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->take($limit)
             ->get();
+    }
+    /**
+     * Get task trend for the last 7 days based on scope.
+     */
+    public function getTaskTrend(?User $user = null, string $scope = 'global'): array
+    {
+        $user = $user ?? auth()->user();
+        $dates = [];
+        $completedData = [];
+        $newData = [];
+
+        for ($i = 6; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $dates[] = now()->subDays($i)->locale('id')->isoFormat('D MMM');
+
+            // New tasks created on this date
+            $query = Tugas::whereNull('deleted_at')
+                ->whereDate('created_at', $date);
+
+            // Admin logic
+            if ($user->isAdmin()) {
+                if ($scope === 'personal') {
+                    $query->where('created_by', $user->id);
+                }
+            } else {
+                // Employee logic
+                $query->where('user_id', $user->id);
+            }
+            $newData[] = $query->count();
+
+            // Completed (approved) tasks on this date
+            $queryCompleted = Tugas::whereNull('deleted_at')
+                ->where('status', 'approved')
+                ->whereDate('updated_at', $date);
+
+            // Admin logic
+            if ($user->isAdmin()) {
+                if ($scope === 'personal') {
+                    $queryCompleted->where('created_by', $user->id);
+                }
+            } else {
+                // Employee logic
+                $queryCompleted->where('user_id', $user->id);
+            }
+            $completedData[] = $queryCompleted->count();
+        }
+
+        return [
+            'labels' => $dates,
+            'completed' => $completedData,
+            'new' => $newData
+        ];
     }
 }
 
