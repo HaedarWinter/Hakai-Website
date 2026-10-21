@@ -30,16 +30,26 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
-
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
+     * Admin account.
      */
-    public function unverified(): static
+    public function admin(): static
     {
-        return $this->state(fn(array $attributes) => [
-            'email_verified_at' => null,
+        return $this->state(fn (array $attributes) => [
+            'jabatan' => 'Admin',
+        ]);
+    }
+
+    /**
+     * Super admin account.
+     */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'jabatan' => 'Admin',
+            'is_super_admin' => true,
         ]);
     }
 }
